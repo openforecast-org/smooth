@@ -2,7 +2,7 @@
  "schema_version": "0.40",
  "paper": {
   "id": "entrylib:2026.000002",
-  "correction_reason": "The title is shortened to say what the paper is about in fewer words; nothing else changed.",
+  "correction_reason": "The title is shortened. The defining equations and long expressions are set on lines of their own (spec 0.40), and the proof steps of the formal evidence are written as mathematics; term markers holding mathematics, escaped quotation marks and a reference to another claim, which the page showed as raw text, are corrected. Table and result values are given to six significant digits, and every result of the lab record is kept at full precision in the data artefact A18. No claim, conclusion or ID changed.",
   "title": "Admissibility of lagged state space models through the ARIMA form of the whole model",
   "contributions": [
    "C3",
@@ -940,7 +940,7 @@
   },
   {
    "id": "C5",
-   "statement": "On the 198 models among [[D20:575 random additive ETS and GUM models]] whose cancelled MA polynomial $\\theta^*$ has a root inside the unit circle, [[D11:bisection on $r$ with the step-down test applied to $\\theta^*(B/r)$]] gave [[D30:$1/\\min|B|$ over the roots $B$ of $\\theta^*$]] within 5.8e-11 of the value from [[D15:numpy's roots]].",
+   "statement": "On the 198 models among [[D20:575 random additive ETS and GUM models]] whose cancelled MA polynomial $\\theta^*$ has a root inside the unit circle, [[D11:bisection]] on $r$ with the step-down test applied to $\\theta^*(B/r)$ gave $1/\\min|B|$ over the roots $B$ of $\\theta^*$, the [[D30:largest mode modulus]], within 5.8e-11 of the value from [[D15:numpy's roots]].",
    "about": {
     "subject": "D11",
     "relation": "gives the same largest mode modulus as",
@@ -1412,7 +1412,7 @@
   },
   {
    "id": "C10",
-   "statement": "For [[D24:ETS(A,N,A,A) with seasonal lags 24 and 168, $\\alpha = 0.3$ and $\\gamma = (0.1, 0.05)$]], [[D6:cyclotomic cancellation]] removed a common factor from the MA polynomial, and the [[D30:largest mode modulus]] after cancellation, just below one, equalled the [[D5:PBH reference]] to within rounding error.",
+   "statement": "For [[D24:ETS(A,N,A,A) with seasonal lags 24 and 168]], $\\alpha = 0.3$ and $\\gamma = (0.1, 0.05)$, [[D6:cyclotomic cancellation]] removed a common factor from the MA polynomial, and the [[D30:largest mode modulus]] after cancellation, just below one, equalled the [[D5:PBH reference]] to within rounding error.",
    "about": {
     "subject": "D6",
     "relation": "gives the same value of",
@@ -1826,7 +1826,7 @@
   },
   {
    "id": "C22",
-   "statement": "For [[D35:ETS(A,N,A) with $m = 12$]], $\\alpha = 1.2$ and $\\gamma = 0.9$, the [[D16:stability condition of Section 5.4 of the ADAM monograph]] holds, while in the full discount recursion the effect of the initial states on the fitted values and the weight of a past observation both grow from period to period, and the largest root modulus of the cancelled MA polynomial exceeds one.",
+   "statement": "For [[D35:ETS(A,N,A)]] with $m = 12$, $\\alpha = 1.2$ and $\\gamma = 0.9$, the [[D16:stability condition of Section 5.4 of the ADAM monograph]] holds, while in the full discount recursion the effect of the initial states on the fitted values and the weight of a past observation both grow from period to period, and the largest root modulus of the cancelled MA polynomial exceeds one.",
    "about": {
     "subject": "D16",
     "relation": "holds for a model that is not admissible",
@@ -1894,7 +1894,7 @@
   },
   {
    "id": "C23",
-   "statement": "Over five fits with bounds=\\\"admissible\\\", the median time of a fit with [[D12:the polynomial check]] was comparable to that with [[D4:the per-lag check]], also for adam() with seasonal lags 24 and 168 on [[D38:hourly data]], with optimisation paths that differ between the checks.",
+   "statement": "Over five fits with bounds=\"admissible\", the median time of a fit with [[D12:the polynomial check]] was comparable to that with [[D4:the per-lag check]], also for adam() with seasonal lags 24 and 168 on [[D38:hourly data]], with optimisation paths that differ between the checks.",
    "about": {
     "subject": "D12",
     "relation": "takes about as long per fit as",
@@ -1947,7 +1947,7 @@
   },
   {
    "id": "C24",
-   "statement": "On [[D22:1,000 new random ADAM ETS+ARIMA models]] (500 with ARIMA at lag 1, 500 with seasonal ARIMA), [[D13:checking the ETS part and the ARIMA polynomials apart]], as adam() did with bounds=\\\"admissible\\\", gave an [[D29:admissibility decision]] different from the [[D5:PBH reference]] of the whole model on about a third of the models in each family, accepting models that are not forecastable and rejecting models that are.",
+   "statement": "On [[D22:1,000 new random ADAM ETS+ARIMA models]] (500 with ARIMA at lag 1, 500 with seasonal ARIMA), [[D13:checking the ETS part and the ARIMA polynomials apart]], as adam() did with bounds=\"admissible\", gave an [[D29:admissibility decision]] different from the [[D5:PBH reference]] of the whole model on about a third of the models in each family, accepting models that are not forecastable and rejecting models that are.",
    "about": {
     "subject": "D13",
     "relation": "gives admissibility decisions different from",
@@ -2055,7 +2055,7 @@
   },
   {
    "id": "C25",
-   "statement": "On the same [[D22:1,000 random ETS+ARIMA models]], [[D10:the check of the whole model]], the criterion of [[C3]] applied to the whole model (the MA polynomial of the ARIMA form of the whole lagged SSOE after [[D6:cyclotomic cancellation]], with the AR polynomial of the ARIMA part stationary), gave the same [[D29:admissibility decision]] as the [[D5:PBH reference]] on every model, and the same [[D30:largest modulus]] to within rounding error on the models both found inadmissible.",
+   "statement": "On the same [[D22:1,000 random ETS+ARIMA models]], [[D10:the check of the whole model]] (the MA polynomial of the ARIMA form of the whole lagged SSOE after [[D6:cyclotomic cancellation]], with the AR polynomial of the ARIMA part stationary), gave the same [[D29:admissibility decision]] as the [[D5:PBH reference]] on every model, and the same [[D30:largest modulus]] to within rounding error on the models both found inadmissible.",
    "about": {
     "subject": "D10",
     "relation": "gives the same admissibility decision and largest mode modulus as",
@@ -2178,7 +2178,7 @@
   },
   {
    "id": "C26",
-   "statement": "On [[D22:1,000 further random ETS+ARIMA models]], [[D14:the bounds checker of adam() in R and of ADAM in Python]] with bounds=\\\"admissible\\\", which run smoothEigensCpp() on the whole model, gave the same [[D29:admissibility decision]] as [[D10:the prototype check of the whole model]] on every model, and a penalty slope ([[D30:the largest root modulus]]) within the bisection tolerance of it in both families.",
+   "statement": "On [[D22:1,000 further random ETS+ARIMA models]], [[D14:the bounds checker of adam() in R and of ADAM in Python]] with bounds=\"admissible\", which run smoothEigensCpp() on the whole model, gave the same [[D29:admissibility decision]] as [[D10:the prototype check of the whole model]] on every model, and a penalty slope ([[D30:the largest root modulus]]) within the bisection tolerance of it in both families.",
    "about": {
     "subject": "D14",
     "relation": "gives the same admissibility decision and largest mode modulus as",
@@ -2335,7 +2335,7 @@
   },
   {
    "id": "C27",
-   "statement": "With [[D14:the check of the whole model and its shortcut for pure ARIMA]], the median time of five fits with bounds=\\\"admissible\\\" of two ARIMA and two ETS+ARIMA models was close to that with [[D13:the check of the parts apart]]; the log-likelihood of SARIMA(1,1,1)(1,1,1)[12] on [[D36:AirPassengers]] rose slightly, and that of ETS(A,N,A)+ARIMA(1,0,1) fell, to another local optimum.",
+   "statement": "With [[D14:the check of the whole model and its shortcut for pure ARIMA]], the median time of five fits with bounds=\"admissible\" of two ARIMA and two ETS+ARIMA models was close to that with [[D13:the check of the parts apart]]; the log-likelihood of SARIMA(1,1,1)(1,1,1)[12] on [[D36:AirPassengers]] rose slightly, and that of ETS(A,N,A)+ARIMA(1,0,1) fell, to another local optimum.",
    "about": {
     "subject": "D14",
     "relation": "takes about as long per fit as",
@@ -2638,7 +2638,7 @@
     {
      "id": "R2",
      "variable": "max abs difference of max |lambda| from the PBH reference, inadmissible models",
-     "value": 4.39648317751562e-13,
+     "value": 4.39648e-13,
      "conditions": {
       "inadmissible_models": 172
      }
@@ -2766,7 +2766,7 @@
     {
      "id": "R1",
      "variable": "max abs difference of max |lambda|, bisection against roots",
-     "value": 5.813682868449632e-11,
+     "value": 5.81368e-11,
      "conditions": {
       "inadmissible_models": 198
      }
@@ -2871,7 +2871,7 @@
        ],
        "values": [
         0,
-        9.48848823512094e-07,
+        9.48849e-07,
         0,
         0.0,
         86
@@ -2884,7 +2884,7 @@
        ],
        "values": [
         0,
-        9.526633371059745e-07,
+        9.52663e-07,
         0,
         0.0,
         95
@@ -2897,7 +2897,7 @@
        ],
        "values": [
         0,
-        9.405809149320987e-07,
+        9.40581e-07,
         0,
         0.0,
         84
@@ -2910,13 +2910,14 @@
        ],
        "values": [
         0,
-        9.485389538266276e-07,
+        9.48539e-07,
         0,
         0.0,
         27
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     }
    ]
   },
@@ -2962,7 +2963,7 @@
     {
      "id": "R11",
      "variable": "max relative error of the determinant identity",
-     "value": 9.171563565208779e-15,
+     "value": 9.17156e-15,
      "conditions": {
       "models": 100
      }
@@ -2978,7 +2979,7 @@
     {
      "id": "R13",
      "variable": "max |lambda|, all modes of the expanded discount matrix",
-     "value": 0.9045379057839597,
+     "value": 0.904538,
      "conditions": {
       "model": "block-diagonal D, lags (1,12)"
      }
@@ -2986,7 +2987,7 @@
     {
      "id": "R14",
      "variable": "mean time, ms",
-     "value": 4.6963541200011605,
+     "value": 4.69635,
      "conditions": {
       "task": "coefficients by DFT",
       "degree": 193
@@ -2995,7 +2996,7 @@
     {
      "id": "R15",
      "variable": "mean time, ms",
-     "value": 0.006939219999821944,
+     "value": 0.00693922,
      "conditions": {
       "task": "step-down test",
       "degree": 193
@@ -3004,7 +3005,7 @@
     {
      "id": "R16",
      "variable": "mean time, ms",
-     "value": 22.225657179999416,
+     "value": 22.2257,
      "conditions": {
       "task": "all roots, numpy companion eigenvalues",
       "degree": 193
@@ -3045,9 +3046,9 @@
        "values": [
         193.0,
         25.0,
-        1.0000000000000038,
-        0.9999965469723225,
-        0.9999965469723241
+        1.0,
+        0.999997,
+        0.999997
        ]
       },
       {
@@ -3058,12 +3059,13 @@
        "values": [
         26.0,
         14.0,
-        1.0000014857614217,
-        0.9829371631611427,
-        0.9829371631611421
+        1.0,
+        0.982937,
+        0.982937
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     }
    ]
   },
@@ -3078,7 +3080,7 @@
    "steps": [
     {
      "id": "S1",
-     "statement": "\\epsilon_t = y_t - w' v_{t-l} \\Rightarrow v_t = D v_{t-l} + g y_t,\\ D = F - g w'",
+     "statement": "$$\\epsilon_t = y_t - w' v_{t-l} \\Rightarrow v_t = D v_{t-l} + g y_t,\\ D = F - g w'$$",
      "by": [
       "D1"
      ],
@@ -3086,7 +3088,7 @@
     },
     {
      "id": "S2",
-     "statement": "v_{t-l} = L(B) v_t \\Rightarrow (I - D L(B)) v_t = g y_t",
+     "statement": "$$v_{t-l} = L(B) v_t \\Rightarrow (I - D L(B)) v_t = g y_t$$",
      "by": [
       "S1",
       "D1"
@@ -3095,7 +3097,7 @@
     },
     {
      "id": "S3",
-     "statement": "\\det(I - D L(B))|_{B=0} = 1 \\Rightarrow I - D L(B) \\text{ is invertible over rational functions}",
+     "statement": "$$\\det(I - D L(B))|_{B=0} = 1 \\Rightarrow I - D L(B) \\text{ is invertible over rational functions}$$",
      "by": [
       "S2"
      ],
@@ -3103,7 +3105,7 @@
     },
     {
      "id": "S4",
-     "statement": "\\epsilon_t = \\left(1 - w' L(B) (I - D L(B))^{-1} g\\right) y_t",
+     "statement": "$$\\epsilon_t = \\left(1 - w' L(B) (I - D L(B))^{-1} g\\right) y_t$$",
      "by": [
       "S1",
       "S2",
@@ -3113,7 +3115,7 @@
     },
     {
      "id": "S5",
-     "statement": "I - D L(B) - g\\, w' L(B) = I - F L(B)",
+     "statement": "$$I - D L(B) - g\\, w' L(B) = I - F L(B)$$",
      "by": [
       "D1"
      ],
@@ -3121,7 +3123,7 @@
     },
     {
      "id": "S6",
-     "statement": "\\det(I - F L(B)) = \\det(I - D L(B))\\left(1 - w' L(B)(I - D L(B))^{-1} g\\right)",
+     "statement": "$$\\det(I - F L(B)) = \\det(I - D L(B))\\left(1 - w' L(B)(I - D L(B))^{-1} g\\right)$$",
      "by": [
       "S3",
       "S5"
@@ -3130,7 +3132,7 @@
     },
     {
      "id": "S7",
-     "statement": "\\det(I - D L(B))\\, \\epsilon_t = \\det(I - F L(B))\\, y_t",
+     "statement": "$$\\det(I - D L(B))\\, \\epsilon_t = \\det(I - F L(B))\\, y_t$$",
      "by": [
       "S4",
       "S6"
@@ -3150,7 +3152,7 @@
    "steps": [
     {
      "id": "S1",
-     "statement": "\\det(\\lambda I - \\tilde M) = \\det(\\Lambda(\\lambda) - M) \\text{ for the lag-1 expansion } \\tilde M \\text{ of } v_t = M v_{t-l}",
+     "statement": "$$\\det(\\lambda I - \\tilde M) = \\det(\\Lambda(\\lambda) - M) \\text{ for the lag-1 expansion } \\tilde M \\text{ of } v_t = M v_{t-l}$$",
      "by": [
       "C15"
      ],
@@ -3158,7 +3160,7 @@
     },
     {
      "id": "S2",
-     "statement": "D = \\mathrm{blockdiag}(D_{ll}) \\Rightarrow \\det(\\Lambda(\\lambda) - D) = \\prod_l \\det(\\lambda^l I - D_{ll})",
+     "statement": "$$D = \\mathrm{blockdiag}(D_{ll}) \\Rightarrow \\det(\\Lambda(\\lambda) - D) = \\prod_l \\det(\\lambda^l I - D_{ll})$$",
      "by": [
       "S1",
       "D1"
@@ -3167,7 +3169,7 @@
     },
     {
      "id": "S3",
-     "statement": "\\det(\\lambda^l I - D_{ll}) = 0 \\iff \\lambda^l = \\mu,\\ \\mu \\in \\mathrm{eig}(D_{ll}) \\Rightarrow |\\lambda| = |\\mu|^{1/l}",
+     "statement": "$$\\det(\\lambda^l I - D_{ll}) = 0 \\iff \\lambda^l = \\mu,\\ \\mu \\in \\mathrm{eig}(D_{ll}) \\Rightarrow |\\lambda| = |\\mu|^{1/l}$$",
      "by": [
       "S2"
      ],
@@ -3175,7 +3177,7 @@
     },
     {
      "id": "S4",
-     "statement": "|\\lambda| < 1 \\iff |\\mu| < 1",
+     "statement": "$$|\\lambda| < 1 \\iff |\\mu| < 1$$",
      "by": [
       "S3"
      ],
@@ -3194,7 +3196,7 @@
    "steps": [
     {
      "id": "S1",
-     "statement": "\\tilde F u = \\lambda u,\\ \\tilde w' u = 0 \\Rightarrow \\tilde D u = \\tilde F u - \\tilde g (\\tilde w' u) = \\lambda u",
+     "statement": "$$\\tilde F u = \\lambda u,\\ \\tilde w' u = 0 \\Rightarrow \\tilde D u = \\tilde F u - \\tilde g (\\tilde w' u) = \\lambda u$$",
      "by": [
       "D2"
      ],
@@ -3202,7 +3204,7 @@
     },
     {
      "id": "S2",
-     "statement": "u' \\tilde F = \\lambda u',\\ u' \\tilde g = 0 \\Rightarrow u' \\tilde D = u' \\tilde F - (u' \\tilde g) \\tilde w' = \\lambda u'",
+     "statement": "$$u' \\tilde F = \\lambda u',\\ u' \\tilde g = 0 \\Rightarrow u' \\tilde D = u' \\tilde F - (u' \\tilde g) \\tilde w' = \\lambda u'$$",
      "by": [
       "D2"
      ],
@@ -3210,7 +3212,7 @@
     },
     {
      "id": "S3",
-     "statement": "\\det(\\lambda I - \\tilde M) = \\lambda^{\\sum_j l_j} \\det(I - M L(1/\\lambda)),\\ \\lambda \\neq 0",
+     "statement": "$$\\det(\\lambda I - \\tilde M) = \\lambda^{\\sum_j l_j} \\det(I - M L(1/\\lambda)),\\ \\lambda \\neq 0$$",
      "by": [
       "C15"
      ],
@@ -3218,7 +3220,7 @@
     },
     {
      "id": "S4",
-     "statement": "\\phi(1/\\lambda) = \\det(I - F L(1/\\lambda)) = 0,\\ \\theta(1/\\lambda) = \\det(I - D L(1/\\lambda)) = 0",
+     "statement": "$$\\phi(1/\\lambda) = \\det(I - F L(1/\\lambda)) = 0,\\ \\theta(1/\\lambda) = \\det(I - D L(1/\\lambda)) = 0$$",
      "by": [
       "S1",
       "S2",
@@ -3239,7 +3241,7 @@
    "steps": [
     {
      "id": "S1",
-     "statement": "D = \\begin{pmatrix} 1-\\alpha & -\\alpha \\\\ -\\gamma & 1-\\gamma \\end{pmatrix},\\ L(B) = \\mathrm{diag}(B, B^m)",
+     "statement": "$$D = \\begin{pmatrix} 1-\\alpha & -\\alpha \\\\ -\\gamma & 1-\\gamma \\end{pmatrix},\\ L(B) = \\mathrm{diag}(B, B^m)$$",
      "by": [
       "D9",
       "D1"
@@ -3248,7 +3250,7 @@
     },
     {
      "id": "S2",
-     "statement": "\\theta(B) = \\det(I - D L(B)) = (1 - (1-\\alpha)B)(1 - (1-\\gamma)B^m) - \\alpha\\gamma B^{m+1}",
+     "statement": "$$\\theta(B) = \\det(I - D L(B)) = (1 - (1-\\alpha)B)(1 - (1-\\gamma)B^m) - \\alpha\\gamma B^{m+1}$$",
      "by": [
       "S1"
      ],
@@ -3256,7 +3258,7 @@
     },
     {
      "id": "S3",
-     "statement": "\\theta(1) = \\alpha\\gamma - \\alpha\\gamma = 0",
+     "statement": "$$\\theta(1) = \\alpha\\gamma - \\alpha\\gamma = 0$$",
      "by": [
       "S2"
      ],
@@ -3264,7 +3266,7 @@
     },
     {
      "id": "S4",
-     "statement": "\\phi(B) = \\det(I - L(B)) = (1 - B)(1 - B^m),\\ \\phi(1) = 0",
+     "statement": "$$\\phi(B) = \\det(I - L(B)) = (1 - B)(1 - B^m),\\ \\phi(1) = 0$$",
      "by": [
       "D9",
       "D1"
@@ -3273,7 +3275,7 @@
     },
     {
      "id": "S5",
-     "statement": "\\det(I - \\tilde D) = 1^{m+1} \\theta(1) = 0",
+     "statement": "$$\\det(I - \\tilde D) = 1^{m+1} \\theta(1) = 0$$",
      "by": [
       "S3",
       "C15"
@@ -3293,7 +3295,7 @@
    "steps": [
     {
      "id": "S1",
-     "statement": "\\lambda I - \\tilde M = \\begin{pmatrix} \\lambda I_k - A & -B \\\\ -C & \\lambda I - S \\end{pmatrix}",
+     "statement": "$$\\lambda I - \\tilde M = \\begin{pmatrix} \\lambda I_k - A & -B \\\\ -C & \\lambda I - S \\end{pmatrix}$$",
      "by": [
       "D2"
      ],
@@ -3301,7 +3303,7 @@
     },
     {
      "id": "S2",
-     "statement": "\\det(\\lambda I - S) = \\lambda^{\\sum_j (l_j - 1)}",
+     "statement": "$$\\det(\\lambda I - S) = \\lambda^{\\sum_j (l_j - 1)}$$",
      "by": [
       "S1"
      ],
@@ -3309,7 +3311,7 @@
     },
     {
      "id": "S3",
-     "statement": "A + B (\\lambda I - S)^{-1} C = M\\, \\mathrm{diag}(\\lambda^{1 - l_1}, \\dots, \\lambda^{1 - l_k}),\\ \\lambda \\neq 0",
+     "statement": "$$A + B (\\lambda I - S)^{-1} C = M\\, \\mathrm{diag}(\\lambda^{1 - l_1}, \\dots, \\lambda^{1 - l_k}),\\ \\lambda \\neq 0$$",
      "by": [
       "S1"
      ],
@@ -3317,7 +3319,7 @@
     },
     {
      "id": "S4",
-     "statement": "\\det(\\lambda I - \\tilde M) = \\lambda^{\\sum_j (l_j - 1)} \\det(\\lambda I_k - M\\, \\mathrm{diag}(\\lambda^{1 - l_j})) = \\det(\\Lambda(\\lambda) - M),\\ \\lambda \\neq 0",
+     "statement": "$$\\det(\\lambda I - \\tilde M) = \\lambda^{\\sum_j (l_j - 1)} \\det(\\lambda I_k - M\\, \\mathrm{diag}(\\lambda^{1 - l_j})) = \\det(\\Lambda(\\lambda) - M),\\ \\lambda \\neq 0$$",
      "by": [
       "S2",
       "S3"
@@ -3326,7 +3328,7 @@
     },
     {
      "id": "S5",
-     "statement": "\\det(\\lambda I - \\tilde M) = \\det(\\Lambda(\\lambda) - M) \\text{ for all } \\lambda",
+     "statement": "$$\\det(\\lambda I - \\tilde M) = \\det(\\Lambda(\\lambda) - M) \\text{ for all } \\lambda$$",
      "by": [
       "S4"
      ],
@@ -3334,7 +3336,7 @@
     },
     {
      "id": "S6",
-     "statement": "\\det(\\lambda I - \\tilde M) = \\lambda^{\\sum_j l_j} \\det(I - M L(1/\\lambda)),\\ \\lambda \\neq 0",
+     "statement": "$$\\det(\\lambda I - \\tilde M) = \\lambda^{\\sum_j l_j} \\det(I - M L(1/\\lambda)),\\ \\lambda \\neq 0$$",
      "by": [
       "S5",
       "D1"
@@ -3415,10 +3417,10 @@
         193
        ],
        "values": [
-        0.7429920399954426,
-        23.75985405999927,
+        0.742992,
+        23.7599,
         193,
-        6.57281667999996
+        6.57282
        ]
       },
       {
@@ -3428,8 +3430,8 @@
         193
        ],
        "values": [
-        0.8138564999990194,
-        20.8541055600017,
+        0.813856,
+        20.8541,
         170,
         null
        ]
@@ -3441,13 +3443,14 @@
         168
        ],
        "values": [
-        0.4172366199964017,
-        17.457083500003137,
+        0.417237,
+        17.4571,
         null,
         null
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     }
    ]
   },
@@ -3462,7 +3465,7 @@
    "steps": [
     {
      "id": "S1",
-     "statement": "\\exists T: T^{-1}\\tilde F T \\text{ block-triangular with a reachable and observable block } (F_{co}, g_{co}, w_{co}),\\ \\tilde w'(zI - \\tilde F)^{-1}\\tilde g = w_{co}'(zI - F_{co})^{-1} g_{co}",
+     "statement": "$$\\exists T: T^{-1}\\tilde F T \\text{ block-triangular with a reachable and observable block } (F_{co}, g_{co}, w_{co}),\\ \\tilde w'(zI - \\tilde F)^{-1}\\tilde g = w_{co}'(zI - F_{co})^{-1} g_{co}$$",
      "by": [
       "D2"
      ],
@@ -3470,7 +3473,7 @@
     },
     {
      "id": "S2",
-     "statement": "\\tilde D = \\tilde F - \\tilde g \\tilde w' \\text{ keeps the reachable and the unobservable subspaces, so } D_{co} = F_{co} - g_{co} w_{co}'",
+     "statement": "$$\\tilde D = \\tilde F - \\tilde g \\tilde w' \\text{ keeps the reachable and the unobservable subspaces, so } D_{co} = F_{co} - g_{co} w_{co}'$$",
      "by": [
       "S1",
       "D2"
@@ -3479,7 +3482,7 @@
     },
     {
      "id": "S3",
-     "statement": "1 + w_{co}'(zI - F_{co})^{-1} g_{co} = \\frac{\\det(zI - D_{co})}{\\det(zI - F_{co})},\\ \\gcd(\\det(zI - D_{co}), \\det(zI - F_{co})) = 1",
+     "statement": "$$1 + w_{co}'(zI - F_{co})^{-1} g_{co} = \\frac{\\det(zI - D_{co})}{\\det(zI - F_{co})},\\ \\gcd(\\det(zI - D_{co}), \\det(zI - F_{co})) = 1$$",
      "by": [
       "S2"
      ],
@@ -3487,7 +3490,7 @@
     },
     {
      "id": "S4",
-     "statement": "1 + \\tilde w'(zI - \\tilde F)^{-1}\\tilde g = \\frac{\\det(zI - \\tilde D)}{\\det(zI - \\tilde F)} = \\frac{\\theta(1/z)}{\\phi(1/z)}",
+     "statement": "$$1 + \\tilde w'(zI - \\tilde F)^{-1}\\tilde g = \\frac{\\det(zI - \\tilde D)}{\\det(zI - \\tilde F)} = \\frac{\\theta(1/z)}{\\phi(1/z)}$$",
      "by": [
       "C15",
       "D1"
@@ -3496,7 +3499,7 @@
     },
     {
      "id": "S5",
-     "statement": "\\frac{\\theta(B)}{\\gcd(\\theta, \\phi)}(B) = 0 \\iff B = 1/\\lambda,\\ \\lambda \\in \\mathrm{spec}(D_{co}) \\setminus \\{0\\} \\text{ (with multiplicity)}",
+     "statement": "$$\\frac{\\theta(B)}{\\gcd(\\theta, \\phi)}(B) = 0 \\iff B = 1/\\lambda,\\ \\lambda \\in \\mathrm{spec}(D_{co}) \\setminus \\{0\\} \\text{ (with multiplicity)}$$",
      "by": [
       "S3",
       "S4"
@@ -3516,13 +3519,13 @@
    "steps": [
     {
      "id": "S1",
-     "statement": "c(B_i) = 0 \\iff c((r B_i) / r) = 0",
+     "statement": "$$c(B_i) = 0 \\iff c((r B_i) / r) = 0$$",
      "by": [],
      "rule": "substitution"
     },
     {
      "id": "S2",
-     "statement": "|r B_i| > 1\\ \\forall i \\iff 1/|B_i| < r\\ \\forall i",
+     "statement": "$$|r B_i| > 1\\ \\forall i \\iff 1/|B_i| < r\\ \\forall i$$",
      "by": [
       "S1"
      ],
@@ -3530,15 +3533,15 @@
     },
     {
      "id": "S3",
-     "statement": "c(B/r) / c(0) = 1 + \\sum_i (c_i / c_0)\\, r^{-i} B^i \\text{ has the roots of } c(B/r)",
+     "statement": "$$c(B/r) / c(0) = 1 + \\sum_i (c_i / c_0)\\, r^{-i} B^i \\text{ has the roots of } c(B/r)$$",
      "by": [
       "S1"
      ],
-     "rule": "c(0) \\neq 0"
+     "rule": "$c(0) \\neq 0$"
     },
     {
      "id": "S4",
-     "statement": "\\text{the step-down passes on } c(B/r) \\iff |r B_i| > 1\\ \\forall i",
+     "statement": "$$\\text{the step-down passes on } c(B/r) \\iff |r B_i| > 1\\ \\forall i$$",
      "by": [
       "D7",
       "S1",
@@ -3559,7 +3562,7 @@
    "steps": [
     {
      "id": "S1",
-     "statement": "\\text{column } j \\text{ of } I - M L(B) = e_j - B^{l_j} m_j",
+     "statement": "$$\\text{column } j \\text{ of } I - M L(B) = e_j - B^{l_j} m_j$$",
      "by": [
       "D1"
      ],
@@ -3567,7 +3570,7 @@
     },
     {
      "id": "S2",
-     "statement": "\\det(I - M L(B)) = \\sum_{S} \\det\\left[\\, e_j\\ (j \\notin S),\\ -B^{l_j} m_j\\ (j \\in S) \\right]",
+     "statement": "$$\\det(I - M L(B)) = \\sum_{S} \\det\\left[\\, e_j\\ (j \\notin S),\\ -B^{l_j} m_j\\ (j \\in S) \\right]$$",
      "by": [
       "S1"
      ],
@@ -3575,7 +3578,7 @@
     },
     {
      "id": "S3",
-     "statement": "\\det\\left[\\, e_j\\ (j \\notin S),\\ -B^{l_j} m_j\\ (j \\in S) \\right] = (-1)^{|S|} B^{\\sum_{j \\in S} l_j} \\det(M_{SS})",
+     "statement": "$$\\det\\left[\\, e_j\\ (j \\notin S),\\ -B^{l_j} m_j\\ (j \\in S) \\right] = (-1)^{|S|} B^{\\sum_{j \\in S} l_j} \\det(M_{SS})$$",
      "by": [
       "S2"
      ],
@@ -3594,7 +3597,7 @@
    "steps": [
     {
      "id": "S1",
-     "statement": "F_{m_i} = F_{\\cdot S_i},\\ g_{m_i} = g_{S_i},\\ w_{m_i} = w_{S_i} \\text{ (zero elsewhere), } S_i \\text{ the components of lag } m_i",
+     "statement": "$$F_{m_i} = F_{\\cdot S_i},\\ g_{m_i} = g_{S_i},\\ w_{m_i} = w_{S_i} \\text{ (zero elsewhere), } S_i \\text{ the components of lag } m_i$$",
      "by": [
       "D1"
      ],
@@ -3602,7 +3605,7 @@
     },
     {
      "id": "S2",
-     "statement": "D_{m_i} = F_{m_i} - g_{m_i} w_{m_i}' \\text{ has non-zero columns only in } S_i",
+     "statement": "$$D_{m_i} = F_{m_i} - g_{m_i} w_{m_i}' \\text{ has non-zero columns only in } S_i$$",
      "by": [
       "S1"
      ],
@@ -3610,7 +3613,7 @@
     },
     {
      "id": "S3",
-     "statement": "D_{m_i} \\sim \\begin{pmatrix} D_{S_i S_i} & 0 \\\\ \\ast & 0 \\end{pmatrix} \\Rightarrow \\mathrm{spec}(D_{m_i}) \\setminus \\{0\\} = \\mathrm{spec}(D_{S_i S_i}) \\setminus \\{0\\}",
+     "statement": "$$D_{m_i} \\sim \\begin{pmatrix} D_{S_i S_i} & 0 \\\\ \\ast & 0 \\end{pmatrix} \\Rightarrow \\mathrm{spec}(D_{m_i}) \\setminus \\{0\\} = \\mathrm{spec}(D_{S_i S_i}) \\setminus \\{0\\}$$",
      "by": [
       "S2"
      ],
@@ -3618,15 +3621,15 @@
     },
     {
      "id": "S4",
-     "statement": "\\sum_i D_{m_i} = F - \\sum_i g_{m_i} w_{m_i}' = D + \\sum_{i \\neq j} g_{m_i} w_{m_j}'",
+     "statement": "$$\\sum_i D_{m_i} = F - \\sum_i g_{m_i} w_{m_i}' = D + \\sum_{i \\neq j} g_{m_i} w_{m_j}'$$",
      "by": [
       "S1"
      ],
-     "rule": "g w' = \\sum_i \\sum_j g_{m_i} w_{m_j}'"
+     "rule": "$g w' = \\sum_i \\sum_j g_{m_i} w_{m_j}'$"
     },
     {
      "id": "S5",
-     "statement": "(a, b) \\text{ with lags } m_i \\neq m_j: \\left(\\sum_{i \\neq j} g_{m_i} w_{m_j}'\\right)_{ab} = g_a w_b",
+     "statement": "$$(a, b) \\text{ with lags } m_i \\neq m_j: \\left(\\sum_{i \\neq j} g_{m_i} w_{m_j}'\\right)_{ab} = g_a w_b$$",
      "by": [
       "S4"
      ],
@@ -3651,7 +3654,7 @@
    "availability": {
     "level": "public"
    },
-   "description": "Exploratory run RN44 of book_check.py --periods 2400: for ETS(A,N,A) with m = 12 and (alpha, gamma) = (0.1, 0.1) and (1.2, 0.9), the largest nonzero eigenvalue modulus of the per-lag discount matrices of the monograph, the effect |w' v_{t-l}| of initial states set to one in the full recursion v_t = D v_{t-l} (y = 0) over 2400 periods and its growth per period over the second half, the growth of the weight of an observation (the same recursion from zero states with one unit observation), and the largest root modulus of the cancelled MA polynomial.",
+   "description": "Exploratory run RN44 of book_check.py --periods 2400: for ETS(A,N,A) with m = 12 and (alpha, gamma) = (0.1, 0.1) and (1.2, 0.9), the largest nonzero eigenvalue modulus of the per-lag discount matrices of the monograph, the effect $|w' v_{t-l}|$ of initial states set to one in the full recursion $v_t = D v_{t-l}$ ($y = 0$) over 2400 periods and its growth per period over the second half, the growth of the weight of an observation (the same recursion from zero states with one unit observation), and the largest root modulus of the cancelled MA polynomial.",
    "setup": {
     "studied": [
      "D16"
@@ -3707,10 +3710,10 @@
        ],
        "values": [
         0.9,
-        1.1870393556989711e-11,
-        0.9895781239569994,
-        0.9909168445987553,
-        0.9911267448787717
+        1.18704e-11,
+        0.989578,
+        0.990917,
+        0.991127
        ]
       },
       {
@@ -3720,14 +3723,15 @@
         0.9
        ],
        "values": [
-        0.19999999999999996,
-        5.968778912343606e+16,
-        1.0163934504137493,
-        1.0163629094999396,
-        1.0164568117563233
+        0.2,
+        5.96878e+16,
+        1.01639,
+        1.01636,
+        1.01646
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     }
    ]
   },
@@ -3792,9 +3796,9 @@
         "gum(AirPassengers, orders=c(1,1), lags=c(1,12))"
        ],
        "values": [
-        0.0969999999999942,
+        0.097,
         484,
-        0.0799999999999983,
+        0.08,
         484,
         40,
         0.8247
@@ -3806,9 +3810,9 @@
         "gum(AirPassengers, orders=c(2,1), lags=c(1,12))"
        ],
        "values": [
-        0.162999999999997,
+        0.163,
         964,
-        0.194999999999993,
+        0.195,
         964,
         43,
         1.1963
@@ -3820,9 +3824,9 @@
         "adam(AirPassengers, \"AAdA\")"
        ],
        "values": [
-        0.0520000000000067,
+        0.052,
         162,
-        0.0459999999999923,
+        0.046,
         162,
         60,
         0.8846
@@ -3834,9 +3838,9 @@
         "adam(hourly, \"ANA\", lags=c(24,168))"
        ],
        "values": [
-        0.143999999999991,
+        0.144,
         122,
-        0.155999999999992,
+        0.156,
         122,
         52,
         1.0833
@@ -3848,15 +3852,16 @@
         "ces(AirPassengers, \"full\")"
        ],
        "values": [
-        0.0599999999999881,
+        0.06,
         324,
-        0.0559999999999974,
+        0.056,
         310,
         68,
         0.9333
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     }
    ],
    "execution": {
@@ -3898,7 +3903,7 @@
     {
      "id": "R17",
      "variable": "max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials",
-     "value": 2.8171909249863347e-15,
+     "value": 2.81719e-15,
      "conditions": {
       "models": 1000
      }
@@ -3914,7 +3919,7 @@
     {
      "id": "R19",
      "variable": "max abs difference between the matrices built here and those of adam()",
-     "value": 4.440892098500626e-15,
+     "value": 4.44089e-15,
      "conditions": {
       "models": 20
      }
@@ -3996,7 +4001,8 @@
         0
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     },
     {
      "id": "T2",
@@ -4021,7 +4027,7 @@
         "ETS+ARIMA"
        ],
        "values": [
-        4.3076653355456074e-13,
+        4.30767e-13,
         159,
         341
        ]
@@ -4032,12 +4038,13 @@
         "ETS+SARIMA"
        ],
        "values": [
-        1.6268764113647194e-11,
+        1.62688e-11,
         87,
         413
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     }
    ]
   },
@@ -4072,7 +4079,7 @@
     {
      "id": "R17",
      "variable": "max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials",
-     "value": 2.8171909249863347e-15,
+     "value": 2.81719e-15,
      "conditions": {
       "models": 1000
      }
@@ -4088,7 +4095,7 @@
     {
      "id": "R19",
      "variable": "max abs difference between the matrices built here and those of adam()",
-     "value": 4.440892098500626e-15,
+     "value": 4.44089e-15,
      "conditions": {
       "models": 20
      }
@@ -4170,7 +4177,8 @@
         0
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     },
     {
      "id": "T2",
@@ -4195,7 +4203,7 @@
         "ETS+ARIMA"
        ],
        "values": [
-        4.3076653355456074e-13,
+        4.30767e-13,
         159,
         341
        ]
@@ -4206,12 +4214,13 @@
         "ETS+SARIMA"
        ],
        "values": [
-        1.6268764113647194e-11,
+        1.62688e-11,
         87,
         413
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     }
    ]
   },
@@ -4246,7 +4255,7 @@
     {
      "id": "R17",
      "variable": "max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials",
-     "value": 2.6922908347160046e-15,
+     "value": 2.69229e-15,
      "conditions": {
       "models": 1000
      }
@@ -4328,7 +4337,8 @@
         0
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     },
     {
      "id": "T2",
@@ -4353,7 +4363,7 @@
         "ETS+ARIMA"
        ],
        "values": [
-        1.3655743202889425e-13,
+        1.36557e-13,
         159,
         341
        ]
@@ -4364,12 +4374,13 @@
         "ETS+SARIMA"
        ],
        "values": [
-        6.726019741165601e-11,
+        6.72602e-11,
         76,
         424
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     },
     {
      "id": "T3",
@@ -4395,7 +4406,7 @@
        ],
        "values": [
         0,
-        9.53674319736919e-07,
+        9.53674e-07,
         341
        ]
       },
@@ -4407,7 +4418,7 @@
        ],
        "values": [
         0,
-        9.536743161842054e-07,
+        9.53674e-07,
         341
        ]
       },
@@ -4419,7 +4430,7 @@
        ],
        "values": [
         0,
-        9.484902201428724e-07,
+        9.4849e-07,
         424
        ]
       },
@@ -4431,11 +4442,12 @@
        ],
        "values": [
         0,
-        9.484902243617199e-07,
+        9.4849e-07,
         424
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     }
    ]
   },
@@ -4497,10 +4509,10 @@
         "ARIMA(1,1,1)(1,1,1)[12]"
        ],
        "values": [
-        0.0700000000000001,
-        0.0740000000000001,
-        -541.844444789273,
-        -541.382357389734
+        0.07,
+        0.074,
+        -541.844,
+        -541.382
        ]
       },
       {
@@ -4509,10 +4521,10 @@
         "ETS(A,N,A)+ARIMA(1,0,1)"
        ],
        "values": [
-        0.0669999999999997,
-        0.0640000000000001,
-        -569.649169125733,
-        -572.214179521351
+        0.067,
+        0.064,
+        -569.649,
+        -572.214
        ]
       },
       {
@@ -4521,10 +4533,10 @@
         "ETS(A,Ad,N)+ARIMA(0,1,2)"
        ],
        "values": [
-        0.0779999999999998,
-        0.0780000000000003,
-        -255.264423392167,
-        -255.264424161103
+        0.078,
+        0.078,
+        -255.264,
+        -255.264
        ]
       },
       {
@@ -4533,13 +4545,14 @@
         "ssarima (1,1,1)(1,1,1)[12]"
        ],
        "values": [
-        0.0799999999999996,
-        0.0829999999999997,
-        -556.990376211077,
-        -556.990376211077
+        0.08,
+        0.083,
+        -556.99,
+        -556.99
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     }
    ]
   },
@@ -4690,7 +4703,8 @@
         1.0
        ]
       }
-     ]
+     ],
+     "artefact": "A18"
     }
    ]
   }
@@ -5025,6 +5039,39 @@
    "version": "sha256:0f5604775db84b6739363561e87a908fb76c683ffcce3e3771a86227ed88f5d4",
    "licence": "LGPL-2.1-only",
    "description": "the C++ check shared by R and Python (smoothEigensCpp()), at the version tested by C26"
+  },
+  {
+   "id": "A18",
+   "kind": "data",
+   "uri": "files/adam-admissible-bounds.results.csv",
+   "version": "sha256:80ecf44a3f0b74229f69e46708f79ebed177deaa92cb989a84bb85e823a419f8",
+   "availability": {
+    "level": "public"
+   },
+   "licence": "CC-BY-4.0",
+   "description": "Every result of the lab record at full precision, one row per result: the lab result, the run that produced it, the quantity, its conditions (JSON) and the value.",
+   "columns": [
+    {
+     "name": "lab_result",
+     "dimension": "lab record result"
+    },
+    {
+     "name": "run",
+     "dimension": "lab record run"
+    },
+    {
+     "name": "quantity",
+     "dimension": "quantity"
+    },
+    {
+     "name": "conditions",
+     "dimension": "conditions of the result"
+    },
+    {
+     "name": "value",
+     "variable": "value of the quantity"
+    }
+   ]
   }
  ],
  "references": [

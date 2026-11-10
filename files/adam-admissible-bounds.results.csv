@@ -1,0 +1,1218 @@
+lab_result,run,quantity,conditions,value
+RS1,RN2,"max |lambda|, per-lag check","{""alpha"": 0.1, ""gamma"": 0.1, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.9
+RS2,RN2,"max |lambda|, all modes of the expanded discount matrix","{""alpha"": 0.1, ""gamma"": 0.1, ""m"": 12, ""model"": ""ETS(A,N,A)""}",1.0000000000000009
+RS3,RN2,"max |lambda|, controllable and observable modes (PBH)","{""alpha"": 0.1, ""gamma"": 0.1, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.991126744878771
+RS4,RN2,"max |lambda|, roots of theta after cyclotomic cancellation","{""alpha"": 0.1, ""gamma"": 0.1, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.9911267448787717
+RS5,RN2,"max |lambda|, per-lag check","{""alpha"": 0.5, ""gamma"": 1.4, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.5
+RS6,RN2,"max |lambda|, all modes of the expanded discount matrix","{""alpha"": 0.5, ""gamma"": 1.4, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.9999999999999998
+RS7,RN2,"max |lambda|, controllable and observable modes (PBH)","{""alpha"": 0.5, ""gamma"": 1.4, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.997236071335398
+RS8,RN2,"max |lambda|, roots of theta after cyclotomic cancellation","{""alpha"": 0.5, ""gamma"": 1.4, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.9972360713353955
+RS9,RN2,"max |lambda|, per-lag check","{""alpha"": 1.2, ""gamma"": 0.9, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.19999999999999996
+RS10,RN2,"max |lambda|, all modes of the expanded discount matrix","{""alpha"": 1.2, ""gamma"": 0.9, ""m"": 12, ""model"": ""ETS(A,N,A)""}",1.0164568117563206
+RS11,RN2,"max |lambda|, controllable and observable modes (PBH)","{""alpha"": 1.2, ""gamma"": 0.9, ""m"": 12, ""model"": ""ETS(A,N,A)""}",1.0164568117563204
+RS12,RN2,"max |lambda|, roots of theta after cyclotomic cancellation","{""alpha"": 1.2, ""gamma"": 0.9, ""m"": 12, ""model"": ""ETS(A,N,A)""}",1.0164568117563233
+RS13,RN2,"max |lambda|, per-lag check","{""alpha"": 1.9, ""gamma"": 0.05, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.95
+RS14,RN2,"max |lambda|, all modes of the expanded discount matrix","{""alpha"": 1.9, ""gamma"": 0.05, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.999999999999999
+RS15,RN2,"max |lambda|, controllable and observable modes (PBH)","{""alpha"": 1.9, ""gamma"": 0.05, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.9999917721962772
+RS16,RN2,"max |lambda|, roots of theta after cyclotomic cancellation","{""alpha"": 1.9, ""gamma"": 0.05, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.9999917721962791
+RS17,RN2,degree of theta,"{""model"": ""ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)""}",193.0
+RS18,RN2,degree of the shared cyclotomic factor,"{""model"": ""ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)""}",25.0
+RS19,RN2,"max |lambda|, roots of theta before cancellation","{""model"": ""ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)""}",1.0000000000000038
+RS20,RN2,"max |lambda|, roots of theta after cancellation","{""model"": ""ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)""}",0.9999965469723225
+RS21,RN2,"max |lambda|, controllable and observable modes (PBH)","{""model"": ""ETS(A,N,A,A), alpha=0.3, gamma=(0.1,0.05)""}",0.9999965469723241
+RS22,RN2,degree of theta,"{""model"": ""GUM start, orders (2,2), lags (1,12)""}",26.0
+RS23,RN2,degree of the shared cyclotomic factor,"{""model"": ""GUM start, orders (2,2), lags (1,12)""}",14.0
+RS24,RN2,"max |lambda|, roots of theta before cancellation","{""model"": ""GUM start, orders (2,2), lags (1,12)""}",1.0000014857614217
+RS25,RN2,"max |lambda|, roots of theta after cancellation","{""model"": ""GUM start, orders (2,2), lags (1,12)""}",0.9829371631611427
+RS26,RN2,"max |lambda|, controllable and observable modes (PBH)","{""model"": ""GUM start, orders (2,2), lags (1,12)""}",0.9829371631611421
+RS27,RN2,"max |lambda|, per-lag check","{""model"": ""block-diagonal D, lags (1,12)""}",0.7
+RS28,RN2,"max |lambda|, all modes of the expanded discount matrix","{""model"": ""block-diagonal D, lags (1,12)""}",0.9045379057839597
+RS29,RN2,max relative error of the determinant identity,"{""models"": 100}",9.171563565208779e-15
+RS30,RN2,step-down decisions equal to root decisions,"{""models"": 300}",300.0
+RS31,RN2,"max abs difference, bisection against roots","{""inadmissible_models"": 243}",5.796585433870405e-11
+RS32,RN2,"mean time, ms","{""degree"": 193, ""task"": ""coefficients by DFT""}",4.6963541200011605
+RS33,RN2,"mean time, ms","{""degree"": 193, ""task"": ""step-down test""}",0.006939219999821944
+RS34,RN2,"mean time, ms","{""degree"": 193, ""task"": ""all roots, numpy companion eigenvalues""}",22.225657179999416
+RS35,RN3,models accepted by the per-lag check that do not forget their initial states,"{""family"": ""ETS(A,N,A)"", ""models"": 3042}",1482.0
+RS36,RN3,models rejected by the per-lag check that forget their initial states,"{""family"": ""ETS(A,N,A)"", ""models"": 3042}",0.0
+RS37,RN3,models accepted by the per-lag check,"{""family"": ""ETS(A,N,A)"", ""models"": 3042}",3042.0
+RS38,RN3,models accepted by the per-lag check that do not forget their initial states,"{""family"": ""GUM"", ""models"": 40}",2.0
+RS39,RN3,models rejected by the per-lag check that forget their initial states,"{""family"": ""GUM"", ""models"": 40}",1.0
+RS40,RN3,models accepted by the per-lag check,"{""family"": ""GUM"", ""models"": 40}",39.0
+RS41,RN4,admissibility decisions that differ from the PBH reference,{},0.0
+RS42,RN4,"max abs difference of max |lambda| from the PBH reference, inadmissible models","{""inadmissible_models"": 40}",5.138112157965224e-13
+RS43,RN4,"models within 1e-8 of the unit circle, excluded",{},0.0
+RS44,RN4,models compared,{},100.0
+RS45,RN5,step-down decisions that differ from the decision by the roots,{},0.0
+RS46,RN5,"models within 1e-8 of the unit circle, excluded",{},0.0
+RS47,RN5,models compared,{},115.0
+RS48,RN6,"max abs difference of max |lambda|, bisection against roots","{""inadmissible_models"": 44}",5.600986341391945e-11
+RS49,RN6,"models within 1e-8 of the unit circle, excluded",{},0.0
+RS50,RN6,models compared,{},115.0
+RS51,RN7,models accepted by the per-lag check that do not forget their initial states,"{""family"": ""ETS(A,N,A)"", ""models"": 3042}",1482.0
+RS52,RN7,models rejected by the per-lag check that forget their initial states,"{""family"": ""ETS(A,N,A)"", ""models"": 3042}",0.0
+RS53,RN7,models accepted by the per-lag check,"{""family"": ""ETS(A,N,A)"", ""models"": 3042}",3042.0
+RS54,RN7,models accepted by the per-lag check that do not forget their initial states,"{""family"": ""GUM"", ""models"": 200}",10.0
+RS55,RN7,models rejected by the per-lag check that forget their initial states,"{""family"": ""GUM"", ""models"": 200}",1.0
+RS56,RN7,models accepted by the per-lag check,"{""family"": ""GUM"", ""models"": 200}",193.0
+RS57,RN8,models accepted by the per-lag check that do not forget their initial states,"{""family"": ""ETS(A,N,A)"", ""models"": 3042}",1482.0
+RS58,RN8,models rejected by the per-lag check that forget their initial states,"{""family"": ""ETS(A,N,A)"", ""models"": 3042}",0.0
+RS59,RN8,models accepted by the per-lag check,"{""family"": ""ETS(A,N,A)"", ""models"": 3042}",3042.0
+RS60,RN8,models accepted by the per-lag check that do not forget their initial states,"{""family"": ""GUM"", ""models"": 200}",10.0
+RS61,RN8,models rejected by the per-lag check that forget their initial states,"{""family"": ""GUM"", ""models"": 200}",1.0
+RS62,RN8,models accepted by the per-lag check,"{""family"": ""GUM"", ""models"": 200}",193.0
+RS63,RN9,admissibility decisions that differ from the PBH reference,{},0.0
+RS64,RN9,"max abs difference of max |lambda| from the PBH reference, inadmissible models","{""inadmissible_models"": 172}",4.39648317751562e-13
+RS65,RN9,"models within 1e-8 of the unit circle, excluded",{},0.0
+RS66,RN9,models compared,{},500.0
+RS67,RN10,step-down decisions that differ from the decision by the roots,{},0.0
+RS68,RN10,"models within 1e-8 of the unit circle, excluded",{},0.0
+RS69,RN10,models compared,{},575.0
+RS70,RN11,"max abs difference of max |lambda|, bisection against roots","{""inadmissible_models"": 198}",5.813682868449632e-11
+RS71,RN11,"models within 1e-8 of the unit circle, excluded",{},0.0
+RS72,RN11,models compared,{},575.0
+RS73,RN12,largest root modulus 1/min|B| of the polynomial,"{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), admissible"", ""repeats"": 50}",0.9962080481334653
+RS74,RN12,recursion steps run by the step-down test,"{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), admissible"", ""repeats"": 50}",0
+RS75,RN12,"mean time of the step-down test, ms","{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), admissible"", ""repeats"": 50}",0.5346515200017166
+RS76,RN12,"mean time of all roots by numpy companion eigenvalues, ms","{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), admissible"", ""repeats"": 50}",21.366792959997838
+RS77,RN12,"mean time of the coefficients of theta and phi by inverse DFT, ms","{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), admissible"", ""repeats"": 50}",5.783309199996438
+RS78,RN12,largest root modulus 1/min|B| of the polynomial,"{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), inadmissible"", ""repeats"": 50}",1.0002974785198857
+RS79,RN12,recursion steps run by the step-down test,"{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), inadmissible"", ""repeats"": 50}",170
+RS80,RN12,"mean time of the step-down test, ms","{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), inadmissible"", ""repeats"": 50}",0.789602200002264
+RS81,RN12,"mean time of all roots by numpy companion eigenvalues, ms","{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), inadmissible"", ""repeats"": 50}",21.239734540004065
+RS82,RN12,"mean time of the coefficients of theta and phi by inverse DFT, ms","{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), inadmissible"", ""repeats"": 50}",4.433176579996143
+RS83,RN12,largest root modulus 1/min|B| of the polynomial,"{""degree"": 168, ""model"": ""ETS(A,N,A,A), lags 24 and 168, cancelled theta"", ""repeats"": 50}",0.9999965469723225
+RS84,RN12,recursion steps run by the step-down test,"{""degree"": 168, ""model"": ""ETS(A,N,A,A), lags 24 and 168, cancelled theta"", ""repeats"": 50}",0
+RS85,RN12,"mean time of the step-down test, ms","{""degree"": 168, ""model"": ""ETS(A,N,A,A), lags 24 and 168, cancelled theta"", ""repeats"": 50}",0.46620877999885124
+RS86,RN12,"mean time of all roots by numpy companion eigenvalues, ms","{""degree"": 168, ""model"": ""ETS(A,N,A,A), lags 24 and 168, cancelled theta"", ""repeats"": 50}",17.3032644200066
+RS87,RN12,"mean time of the coefficients of theta and phi by inverse DFT, ms","{""degree"": 168, ""model"": ""ETS(A,N,A,A), lags 24 and 168, cancelled theta"", ""repeats"": 50}",3.6505330199997843
+RS88,RN13,largest root modulus 1/min|B| of the polynomial,"{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), admissible"", ""repeats"": 50}",0.9962080481334653
+RS89,RN13,recursion steps run by the step-down test,"{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), admissible"", ""repeats"": 50}",193
+RS90,RN13,"mean time of the step-down test, ms","{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), admissible"", ""repeats"": 50}",0.7429920399954426
+RS91,RN13,"mean time of all roots by numpy companion eigenvalues, ms","{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), admissible"", ""repeats"": 50}",23.75985405999927
+RS92,RN13,"mean time of the coefficients of theta and phi by inverse DFT, ms","{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), admissible"", ""repeats"": 50}",6.57281667999996
+RS93,RN13,largest root modulus 1/min|B| of the polynomial,"{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), inadmissible"", ""repeats"": 50}",1.0002974785198857
+RS94,RN13,recursion steps run by the step-down test,"{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), inadmissible"", ""repeats"": 50}",170
+RS95,RN13,"mean time of the step-down test, ms","{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), inadmissible"", ""repeats"": 50}",0.8138564999990194
+RS96,RN13,"mean time of all roots by numpy companion eigenvalues, ms","{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), inadmissible"", ""repeats"": 50}",20.8541055600017
+RS97,RN13,"mean time of the coefficients of theta and phi by inverse DFT, ms","{""degree"": 193, ""model"": ""random GUM, lags (1, 24, 168), inadmissible"", ""repeats"": 50}",3.8507816799938155
+RS98,RN13,largest root modulus 1/min|B| of the polynomial,"{""degree"": 168, ""model"": ""ETS(A,N,A,A), lags 24 and 168, cancelled theta"", ""repeats"": 50}",0.9999965469723225
+RS99,RN13,recursion steps run by the step-down test,"{""degree"": 168, ""model"": ""ETS(A,N,A,A), lags 24 and 168, cancelled theta"", ""repeats"": 50}",168
+RS100,RN13,"mean time of the step-down test, ms","{""degree"": 168, ""model"": ""ETS(A,N,A,A), lags 24 and 168, cancelled theta"", ""repeats"": 50}",0.4172366199964017
+RS101,RN13,"mean time of all roots by numpy companion eigenvalues, ms","{""degree"": 168, ""model"": ""ETS(A,N,A,A), lags 24 and 168, cancelled theta"", ""repeats"": 50}",17.457083500003137
+RS102,RN13,"mean time of the coefficients of theta and phi by inverse DFT, ms","{""degree"": 168, ""model"": ""ETS(A,N,A,A), lags 24 and 168, cancelled theta"", ""repeats"": 50}",4.686060920003001
+RS103,RN15,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS"", ""models"": 100}",0
+RS104,RN15,"max abs difference of the largest root modulus, C++ core against prototype","{""family"": ""ETS"", ""models"": 100}",5.820477433360338e-11
+RS105,RN15,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS"", ""models"": 100}",0
+RS106,RN15,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS high degree"", ""models"": 100}",0
+RS107,RN15,"max abs difference of the largest root modulus, C++ core against prototype","{""family"": ""ETS high degree"", ""models"": 100}",1.8247644251179196e-07
+RS108,RN15,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS high degree"", ""models"": 100}",1
+RS109,RN15,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM identity"", ""models"": 100}",0
+RS110,RN15,"max abs difference of the largest root modulus, C++ core against prototype","{""family"": ""GUM identity"", ""models"": 100}",5.8198779129270406e-11
+RS111,RN15,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM identity"", ""models"": 100}",0
+RS112,RN15,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM random"", ""models"": 100}",0
+RS113,RN15,"max abs difference of the largest root modulus, C++ core against prototype","{""family"": ""GUM random"", ""models"": 100}",5.7583937618232994e-11
+RS114,RN15,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM random"", ""models"": 100}",0
+RS115,RN16,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS"", ""models"": 100}",0
+RS116,RN16,"max abs difference of the largest root modulus, C++ core against prototype","{""family"": ""ETS"", ""models"": 100}",5.820477433360338e-11
+RS117,RN16,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS"", ""models"": 100}",0
+RS118,RN16,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS high degree"", ""models"": 100}",0
+RS119,RN16,"max abs difference of the largest root modulus, C++ core against prototype","{""family"": ""ETS high degree"", ""models"": 100}",1.8247644251179196e-07
+RS120,RN16,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS high degree"", ""models"": 100}",1
+RS121,RN16,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM identity"", ""models"": 100}",0
+RS122,RN16,"max abs difference of the largest root modulus, C++ core against prototype","{""family"": ""GUM identity"", ""models"": 100}",5.8198779129270406e-11
+RS123,RN16,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM identity"", ""models"": 100}",0
+RS124,RN16,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM random"", ""models"": 100}",0
+RS125,RN16,"max abs difference of the largest root modulus, C++ core against prototype","{""family"": ""GUM random"", ""models"": 100}",5.7583937618232994e-11
+RS126,RN16,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM random"", ""models"": 100}",0
+RS127,RN18,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,N)""}",10.45
+RS128,RN18,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,N)""}",13.65
+RS129,RN18,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,N)""}",9.00000000000001
+RS130,RN18,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,N)""}",24.75
+RS131,RN18,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A), m=12""}",9.80000000000001
+RS132,RN18,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A), m=12""}",128.8
+RS133,RN18,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,A), m=12""}",13
+RS134,RN18,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,A), m=12""}",144.85
+RS135,RN18,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",11.8
+RS136,RN18,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",5706.8
+RS137,RN18,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",14.6999999999998
+RS138,RN18,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",155.55
+RS139,RN18,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",13.3499999999998
+RS140,RN18,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",449.8
+RS141,RN18,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",12.700000000001
+RS142,RN18,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",8069.35
+RS143,RN18,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.386000000000024
+RS144,RN18,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS145,RN18,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",797.520661157075
+RS146,RN18,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",4.27199999999999
+RS147,RN18,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS148,RN18,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",4431.53526970953
+RS149,RN18,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.826999999999998
+RS150,RN18,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS151,RN18,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",5104.93827160493
+RS152,RN18,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",1.93599999999998
+RS153,RN18,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS154,RN18,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",15868.8524590162
+RS155,RN18,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.351999999999975
+RS156,RN18,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",324
+RS157,RN18,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",1086.41975308634
+RS158,RN18,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.34899999999999
+RS159,RN18,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS160,RN18,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",721.074380165268
+RS161,RN18,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.834000000000003
+RS162,RN18,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS163,RN18,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",865.145228215771
+RS164,RN18,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.137
+RS165,RN18,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS166,RN18,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",845.679012345682
+RS167,RN18,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",1.38999999999999
+RS168,RN18,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS169,RN18,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",11393.4426229507
+RS170,RN18,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",1.28500000000003
+RS171,RN18,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",310
+RS172,RN18,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",4145.16129032266
+RS173,RN19,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,N)""}",8.19999999999999
+RS174,RN19,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,N)""}",13.55
+RS175,RN19,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,N)""}",8.89999999999995
+RS176,RN19,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,N)""}",25.05
+RS177,RN19,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A), m=12""}",9.25000000000002
+RS178,RN19,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A), m=12""}",138.8
+RS179,RN19,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,A), m=12""}",8.89999999999995
+RS180,RN19,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,A), m=12""}",174.55
+RS181,RN19,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",13.4500000000001
+RS182,RN19,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",5723.7
+RS183,RN19,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",10.0999999999999
+RS184,RN19,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",127.799999999999
+RS185,RN19,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",9.70000000000084
+RS186,RN19,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",427.15
+RS187,RN19,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",9.99999999999943
+RS188,RN19,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",7804.1
+RS189,RN19,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.426000000000045
+RS190,RN19,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS191,RN19,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",880.16528925629
+RS192,RN19,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",4.06400000000002
+RS193,RN19,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS194,RN19,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",4215.76763485479
+RS195,RN19,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.954000000000008
+RS196,RN19,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS197,RN19,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",5888.88888888894
+RS198,RN19,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",2.625
+RS199,RN19,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS200,RN19,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",21516.3934426229
+RS201,RN19,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.521000000000015
+RS202,RN19,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",324
+RS203,RN19,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",1608.02469135807
+RS204,RN19,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.563999999999965
+RS205,RN19,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS206,RN19,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",1165.28925619827
+RS207,RN19,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.896000000000015
+RS208,RN19,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS209,RN19,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",929.460580912879
+RS210,RN19,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.141999999999996
+RS211,RN19,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS212,RN19,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",876.543209876518
+RS213,RN19,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",1.36500000000001
+RS214,RN19,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS215,RN19,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",11188.524590164
+RS216,RN19,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",1.01900000000001
+RS217,RN19,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",310
+RS218,RN19,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",3287.09677419357
+RS219,RN21,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""polynomials""}",6.659238
+RS220,RN21,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""cancellation""}",1.216
+RS221,RN21,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""bisection""}",11.3285055
+RS222,RN21,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""one step-down""}",0.569207
+RS223,RN21,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""total""}",17.71119
+RS224,RN21,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""per-lag check""}",6.0179385
+RS225,RN21,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""polynomials""}",128.6661195
+RS226,RN21,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""cancellation""}",74.467109
+RS227,RN21,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""bisection""}",860.740923
+RS228,RN21,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""one step-down""}",32.2736525
+RS229,RN21,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""total""}",916.4888095
+RS230,RN21,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""per-lag check""}",7.311808
+RS231,RN21,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""polynomials""}",140.170032
+RS232,RN21,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""cancellation""}",15.8476695
+RS233,RN21,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""bisection""}",1439.075431
+RS234,RN21,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""one step-down""}",62.470559
+RS235,RN21,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""total""}",1405.384327
+RS236,RN21,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""per-lag check""}",7.0175095
+RS237,RN22,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""polynomials""}",3.462437
+RS238,RN22,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""cancellation""}",0.8567745
+RS239,RN22,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""bisection""}",7.0194645
+RS240,RN22,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""one step-down""}",0.1176635
+RS241,RN22,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""total""}",11.673722
+RS242,RN22,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""per-lag check""}",5.574049
+RS243,RN22,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""polynomials""}",110.074395
+RS244,RN22,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""cancellation""}",69.1916805
+RS245,RN22,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""bisection""}",456.20311
+RS246,RN22,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""one step-down""}",22.4113
+RS247,RN22,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""total""}",659.6677525
+RS248,RN22,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""per-lag check""}",7.2760575
+RS249,RN22,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""polynomials""}",108.924061
+RS250,RN22,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""cancellation""}",12.259129
+RS251,RN22,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""bisection""}",761.249628
+RS252,RN22,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""one step-down""}",27.5459945
+RS253,RN22,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""total""}",906.613701
+RS254,RN22,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""per-lag check""}",6.621135
+RS255,RN23,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""polynomials""}",2.365161
+RS256,RN23,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""cancellation""}",0.887052
+RS257,RN23,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""bisection""}",3.954645
+RS258,RN23,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""one step-down""}",0.1320805
+RS259,RN23,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""total""}",4.51811
+RS260,RN23,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""per-lag check""}",5.884598
+RS261,RN23,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""polynomials""}",69.295117
+RS262,RN23,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""cancellation""}",75.556185
+RS263,RN23,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""bisection""}",146.55046
+RS264,RN23,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""one step-down""}",20.073454
+RS265,RN23,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""total""}",167.9092625
+RS266,RN23,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""per-lag check""}",6.895198
+RS267,RN23,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""polynomials""}",64.969726
+RS268,RN23,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""cancellation""}",12.701911
+RS269,RN23,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""bisection""}",385.7554215
+RS270,RN23,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""one step-down""}",27.278857
+RS271,RN23,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""total""}",113.2001895
+RS272,RN23,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""per-lag check""}",14.0855915
+RS273,RN24,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS"", ""models"": 100}",0
+RS274,RN24,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS"", ""inadmissible"": 53, ""models"": 100}",9.491757726465266e-07
+RS275,RN24,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS"", ""models"": 100}",0
+RS276,RN24,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS high degree"", ""models"": 100}",0
+RS277,RN24,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS high degree"", ""inadmissible"": 53, ""models"": 100}",9.532547819990356e-07
+RS278,RN24,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS high degree"", ""models"": 100}",0
+RS279,RN24,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM identity"", ""models"": 100}",0
+RS280,RN24,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM identity"", ""inadmissible"": 32, ""models"": 100}",9.285570568007273e-07
+RS281,RN24,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM identity"", ""models"": 100}",0
+RS282,RN24,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM random"", ""models"": 100}",0
+RS283,RN24,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM random"", ""inadmissible"": 13, ""models"": 100}",8.463739460395914e-07
+RS284,RN24,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM random"", ""models"": 100}",0
+RS285,RN25,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,N)""}",8.49999999999991
+RS286,RN25,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,N)""}",12.0500000000002
+RS287,RN25,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,N)""}",9.24999999999994
+RS288,RN25,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,N)""}",14.0000000000001
+RS289,RN25,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A), m=12""}",10.35
+RS290,RN25,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A), m=12""}",32.8999999999999
+RS291,RN25,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,A), m=12""}",10.8499999999999
+RS292,RN25,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,A), m=12""}",39.95
+RS293,RN25,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",11.9999999999999
+RS294,RN25,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",913.5
+RS295,RN25,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",9.69999999999978
+RS296,RN25,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",33.4
+RS297,RN25,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",13.7499999999999
+RS298,RN25,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",90.3000000000002
+RS299,RN25,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",12.6000000000001
+RS300,RN25,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",624.15
+RS301,RN25,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.319999999999993
+RS302,RN25,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",1452
+RS303,RN25,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",220.385674931125
+RS304,RN25,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.688999999999993
+RS305,RN25,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",4344
+RS306,RN25,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",158.609576427254
+RS307,RN25,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.138999999999996
+RS308,RN25,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",4830
+RS309,RN25,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",28.7784679089018
+RS310,RN25,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",0.399000000000001
+RS311,RN25,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",5196
+RS312,RN25,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",76.7898383371826
+RS313,RN25,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.397000000000006
+RS314,RN25,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",6168
+RS315,RN25,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",64.3644617380035
+RS316,RN25,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.298999999999992
+RS317,RN25,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",7620
+RS318,RN25,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",39.238845144356
+RS319,RN25,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.653999999999996
+RS320,RN25,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",10512
+RS321,RN25,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",62.2146118721458
+RS322,RN25,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.109999999999999
+RS323,RN25,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",10998
+RS324,RN25,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",10.0018185124568
+RS325,RN25,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",0.659000000000006
+RS326,RN25,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",11364
+RS327,RN25,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",57.9901443153824
+RS328,RN25,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.210000000000008
+RS329,RN25,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",12294
+RS330,RN25,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",17.0815031722798
+RS331,RN26,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,N)""}",6.59999999999954
+RS332,RN26,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,N)""}",5.74999999999974
+RS333,RN26,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,N)""}",5.74999999999974
+RS334,RN26,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,N)""}",6.40000000000001
+RS335,RN26,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A), m=12""}",6.00000000000023
+RS336,RN26,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A), m=12""}",11.8000000000002
+RS337,RN26,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,A), m=12""}",6.30000000000024
+RS338,RN26,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,A), m=12""}",14.4500000000001
+RS339,RN26,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",6.99999999999932
+RS340,RN26,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",177.75
+RS341,RN26,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",6.04999999999976
+RS342,RN26,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",8.0999999999996
+RS343,RN26,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",6.79999999999978
+RS344,RN26,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",19.5
+RS345,RN26,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",9.34999999999988
+RS346,RN26,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",125.400000000001
+RS347,RN26,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.158000000000001
+RS348,RN26,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS349,RN26,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",326.446280991738
+RS350,RN26,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.215000000000003
+RS351,RN26,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS352,RN26,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",223.029045643157
+RS353,RN26,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.0930000000000035
+RS354,RN26,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS355,RN26,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",574.074074074096
+RS356,RN26,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",0.157000000000011
+RS357,RN26,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS358,RN26,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",1286.88524590173
+RS359,RN26,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.085000000000008
+RS360,RN26,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",324
+RS361,RN26,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",262.34567901237
+RS362,RN26,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.179999999999993
+RS363,RN26,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS364,RN26,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",371.900826446266
+RS365,RN26,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.194000000000003
+RS366,RN26,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS367,RN26,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",201.244813278011
+RS368,RN26,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.046999999999997
+RS369,RN26,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS370,RN26,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",290.123456790105
+RS371,RN26,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",0.210999999999999
+RS372,RN26,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS373,RN26,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",1729.5081967213
+RS374,RN26,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.0669999999999931
+RS375,RN26,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",310
+RS376,RN26,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",216.129032258042
+RS377,RN27,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""polynomials""}",1.778918
+RS378,RN27,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""cancellation""}",0.8503975
+RS379,RN27,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""bisection""}",3.818657
+RS380,RN27,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""one step-down""}",0.102324
+RS381,RN27,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""total""}",2.9941905
+RS382,RN27,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""per-lag check""}",5.839458
+RS383,RN27,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""polynomials""}",50.9935995
+RS384,RN27,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""cancellation""}",66.2871
+RS385,RN27,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""bisection""}",146.5607355
+RS386,RN27,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""one step-down""}",20.6573705
+RS387,RN27,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""total""}",159.4565175
+RS388,RN27,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""per-lag check""}",9.4373695
+RS389,RN27,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""polynomials""}",70.4776545
+RS390,RN27,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""cancellation""}",13.7288215
+RS391,RN27,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""bisection""}",389.0035385
+RS392,RN27,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""one step-down""}",26.43232
+RS393,RN27,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""total""}",109.0810995
+RS394,RN27,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""per-lag check""}",7.5643975
+RS395,RN28,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS"", ""models"": 100}",0
+RS396,RN28,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS"", ""inadmissible"": 42, ""models"": 100}",9.276875085895142e-07
+RS397,RN28,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS"", ""models"": 100}",0
+RS398,RN28,max abs difference between three calls of the C++ core on the same model,"{""family"": ""ETS"", ""models"": 100}",0.0
+RS399,RN28,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS high degree"", ""models"": 100}",0
+RS400,RN28,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS high degree"", ""inadmissible"": 48, ""models"": 100}",9.435713137495583e-07
+RS401,RN28,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS high degree"", ""models"": 100}",0
+RS402,RN28,max abs difference between three calls of the C++ core on the same model,"{""family"": ""ETS high degree"", ""models"": 100}",0.0
+RS403,RN28,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM identity"", ""models"": 100}",0
+RS404,RN28,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM identity"", ""inadmissible"": 27, ""models"": 100}",9.412661334806671e-07
+RS405,RN28,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM identity"", ""models"": 100}",0
+RS406,RN28,max abs difference between three calls of the C++ core on the same model,"{""family"": ""GUM identity"", ""models"": 100}",0.0
+RS407,RN28,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM random"", ""models"": 100}",0
+RS408,RN28,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM random"", ""inadmissible"": 23, ""models"": 100}",9.146580040031438e-07
+RS409,RN28,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM random"", ""models"": 100}",99
+RS410,RN28,max abs difference between three calls of the C++ core on the same model,"{""family"": ""GUM random"", ""models"": 100}",0.0
+RS411,RN29,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS"", ""models"": 100}",0
+RS412,RN29,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS"", ""inadmissible"": 42, ""models"": 100}",9.276875085895142e-07
+RS413,RN29,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS"", ""models"": 100}",0
+RS414,RN29,max abs difference between three calls of the C++ core on the same model,"{""family"": ""ETS"", ""models"": 100}",0.0
+RS415,RN29,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS high degree"", ""models"": 100}",0
+RS416,RN29,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS high degree"", ""inadmissible"": 48, ""models"": 100}",9.435713137495583e-07
+RS417,RN29,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS high degree"", ""models"": 100}",0
+RS418,RN29,max abs difference between three calls of the C++ core on the same model,"{""family"": ""ETS high degree"", ""models"": 100}",0.0
+RS419,RN29,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM identity"", ""models"": 100}",0
+RS420,RN29,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM identity"", ""inadmissible"": 27, ""models"": 100}",9.412661334806671e-07
+RS421,RN29,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM identity"", ""models"": 100}",0
+RS422,RN29,max abs difference between three calls of the C++ core on the same model,"{""family"": ""GUM identity"", ""models"": 100}",0.0
+RS423,RN29,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM random"", ""models"": 100}",0
+RS424,RN29,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM random"", ""inadmissible"": 23, ""models"": 100}",9.146580040031438e-07
+RS425,RN29,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM random"", ""models"": 100}",0
+RS426,RN29,max abs difference between three calls of the C++ core on the same model,"{""family"": ""GUM random"", ""models"": 100}",0.0
+RS427,RN30,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""polynomials""}",0.8047235
+RS428,RN30,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""cancellation""}",1.292023
+RS429,RN30,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""bisection""}",3.7871385
+RS430,RN30,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""one step-down""}",0.1246165
+RS431,RN30,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""total""}",2.7274585
+RS432,RN30,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""per-lag check""}",6.268429
+RS433,RN30,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""polynomials""}",2.7239705
+RS434,RN30,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""cancellation""}",39.8712725
+RS435,RN30,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""bisection""}",144.8442555
+RS436,RN30,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""one step-down""}",20.1963595
+RS437,RN30,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""total""}",60.880874
+RS438,RN30,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""per-lag check""}",9.042778
+RS439,RN30,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""polynomials""}",1.394336
+RS440,RN30,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""cancellation""}",1.501892
+RS441,RN30,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""bisection""}",367.8719315
+RS442,RN30,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""one step-down""}",25.759328
+RS443,RN30,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""total""}",29.649838
+RS444,RN30,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""per-lag check""}",6.4930005
+RS445,RN31,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,N)""}",5.60000000000045
+RS446,RN31,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,N)""}",5.49999999999997
+RS447,RN31,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,N)""}",5.75000000000045
+RS448,RN31,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,N)""}",5.89999999999975
+RS449,RN31,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A), m=12""}",5.44999999999973
+RS450,RN31,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A), m=12""}",7.19999999999956
+RS451,RN31,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,A), m=12""}",6.19999999999976
+RS452,RN31,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,A), m=12""}",7.89999999999935
+RS453,RN31,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",5.85000000000022
+RS454,RN31,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",71.3500000000003
+RS455,RN31,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",5.85000000000022
+RS456,RN31,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",6.30000000000024
+RS457,RN31,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",6.55000000000001
+RS458,RN31,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",10.5000000000004
+RS459,RN31,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",6.40000000000001
+RS460,RN31,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",38.5000000000005
+RS461,RN31,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.0990000000000038
+RS462,RN31,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS463,RN31,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",204.545454545462
+RS464,RN31,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.173999999999992
+RS465,RN31,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS466,RN31,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",180.497925311195
+RS467,RN31,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.0519999999999925
+RS468,RN31,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS469,RN31,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",320.987654320941
+RS470,RN31,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",0.141000000000005
+RS471,RN31,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS472,RN31,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",1155.73770491808
+RS473,RN31,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.0600000000000023
+RS474,RN31,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",324
+RS475,RN31,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",185.185185185192
+RS476,RN31,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.0930000000000035
+RS477,RN31,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS478,RN31,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",192.148760330586
+RS479,RN31,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.177000000000007
+RS480,RN31,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS481,RN31,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",183.609958506231
+RS482,RN31,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.0460000000000065
+RS483,RN31,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS484,RN31,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",283.950617283991
+RS485,RN31,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",0.182000000000002
+RS486,RN31,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS487,RN31,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",1491.80327868854
+RS488,RN31,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.0789999999999935
+RS489,RN31,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",310
+RS490,RN31,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",254.838709677398
+RS491,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""polynomials""}",0.6622355
+RS492,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""cancellation""}",1.0523275
+RS493,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""bisection""}",0.182966
+RS494,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""one step-down""}",0.1212805
+RS495,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""total""}",2.2026065
+RS496,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""per-lag check""}",8.065661
+RS497,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""polynomials""}",1.9479035
+RS498,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""cancellation""}",43.5081105
+RS499,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""bisection""}",21.1888455
+RS500,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""one step-down""}",19.9921125
+RS501,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""total""}",60.6534465
+RS502,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""per-lag check""}",9.38836
+RS503,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""polynomials""}",1.364483
+RS504,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""cancellation""}",38.592842
+RS505,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""bisection""}",433.7837275
+RS506,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""one step-down""}",0.074448
+RS507,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""total""}",500.804441
+RS508,RN32,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""per-lag check""}",7.1753555
+RS509,RN32,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""polynomials""}",1.4157125
+RS510,RN32,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""cancellation""}",1.517869
+RS511,RN32,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""bisection""}",27.9988085
+RS512,RN32,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""one step-down""}",28.241609
+RS513,RN32,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""total""}",30.360772
+RS514,RN32,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""per-lag check""}",6.7490325
+RS515,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""polynomials""}",0.8115785
+RS516,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""cancellation""}",0.981055
+RS517,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""bisection""}",0.194748
+RS518,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""one step-down""}",0.107626
+RS519,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""total""}",1.829323
+RS520,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""per-lag check""}",8.34125
+RS521,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""polynomials""}",1.693022
+RS522,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""cancellation""}",39.1251655
+RS523,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""bisection""}",21.084694
+RS524,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""one step-down""}",20.0895855
+RS525,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""total""}",62.94352
+RS526,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""per-lag check""}",7.0310405
+RS527,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""polynomials""}",1.4817355
+RS528,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""cancellation""}",41.672866
+RS529,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""bisection""}",457.530965
+RS530,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""one step-down""}",0.077335
+RS531,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""total""}",500.8744655
+RS532,RN33,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""per-lag check""}",7.339621
+RS533,RN33,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""polynomials""}",1.7261105
+RS534,RN33,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""cancellation""}",1.843933
+RS535,RN33,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""bisection""}",27.4146055
+RS536,RN33,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""one step-down""}",26.0740885
+RS537,RN33,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""total""}",30.582465
+RS538,RN33,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""per-lag check""}",7.2279635
+RS539,RN34,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS"", ""models"": 100}",0
+RS540,RN34,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS"", ""inadmissible"": 41, ""models"": 100}",6.044072018429603e-07
+RS541,RN34,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS"", ""models"": 100}",0
+RS542,RN34,max abs difference between three calls of the C++ core on the same model,"{""family"": ""ETS"", ""models"": 100}",0.0
+RS543,RN34,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS high degree"", ""models"": 100}",0
+RS544,RN34,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS high degree"", ""inadmissible"": 49, ""models"": 100}",9.293846006119821e-07
+RS545,RN34,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS high degree"", ""models"": 100}",0
+RS546,RN34,max abs difference between three calls of the C++ core on the same model,"{""family"": ""ETS high degree"", ""models"": 100}",0.0
+RS547,RN34,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM identity"", ""models"": 100}",0
+RS548,RN34,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM identity"", ""inadmissible"": 42, ""models"": 100}",2.4980361312820776e-07
+RS549,RN34,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM identity"", ""models"": 100}",0
+RS550,RN34,max abs difference between three calls of the C++ core on the same model,"{""family"": ""GUM identity"", ""models"": 100}",0.0
+RS551,RN34,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM random"", ""models"": 100}",0
+RS552,RN34,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM random"", ""inadmissible"": 17, ""models"": 100}",5.099142781350707e-07
+RS553,RN34,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM random"", ""models"": 100}",0
+RS554,RN34,max abs difference between three calls of the C++ core on the same model,"{""family"": ""GUM random"", ""models"": 100}",0.0
+RS555,RN35,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,N)""}",8.29999999999984
+RS556,RN35,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,N)""}",8.0999999999996
+RS557,RN35,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,N)""}",6.85000000000002
+RS558,RN35,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,N)""}",6.00000000000023
+RS559,RN35,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A), m=12""}",5.4000000000002
+RS560,RN35,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A), m=12""}",6.70000000000002
+RS561,RN35,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,A), m=12""}",5.90000000000046
+RS562,RN35,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,A), m=12""}",7.90000000000006
+RS563,RN35,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",6.09999999999999
+RS564,RN35,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",71.3500000000003
+RS565,RN35,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",5.34999999999997
+RS566,RN35,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",5.84999999999951
+RS567,RN35,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",6.70000000000002
+RS568,RN35,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",11.3
+RS569,RN35,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",6.59999999999954
+RS570,RN35,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",39.6000000000001
+RS571,RN35,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.097999999999999
+RS572,RN35,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS573,RN35,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",202.479338842973
+RS574,RN35,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.197000000000003
+RS575,RN35,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS576,RN35,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",204.356846473032
+RS577,RN35,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.0499999999999972
+RS578,RN35,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS579,RN35,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",308.641975308624
+RS580,RN35,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",0.144999999999996
+RS581,RN35,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS582,RN35,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",1188.5245901639
+RS583,RN35,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.0660000000000025
+RS584,RN35,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",324
+RS585,RN35,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",203.703703703711
+RS586,RN35,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.0810000000000031
+RS587,RN35,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS588,RN35,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",40
+RS589,RN35,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",167.355371900833
+RS590,RN35,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.200000000000003
+RS591,RN35,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS592,RN35,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",43
+RS593,RN35,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",207.468879668053
+RS594,RN35,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.0510000000000019
+RS595,RN35,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS596,RN35,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",60
+RS597,RN35,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",314.814814814827
+RS598,RN35,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",0.173999999999992
+RS599,RN35,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS600,RN35,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",52
+RS601,RN35,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",1426.22950819666
+RS602,RN35,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.0590000000000117
+RS603,RN35,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",310
+RS604,RN35,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",68
+RS605,RN35,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",190.322580645199
+RS606,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""polynomials""}",0.7356155
+RS607,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""cancellation""}",0.7957225
+RS608,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""bisection""}",0.160395
+RS609,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""one step-down""}",0.085005
+RS610,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""total""}",1.5176135
+RS611,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""per-lag check""}",54.4310295
+RS612,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""polynomials""}",1.38479
+RS613,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""cancellation""}",34.5659005
+RS614,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""bisection""}",9.810894
+RS615,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""one step-down""}",9.388317
+RS616,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""total""}",49.3608615
+RS617,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""per-lag check""}",9.3237265
+RS618,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""polynomials""}",1.9633785
+RS619,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""cancellation""}",33.615562
+RS620,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""bisection""}",209.954504
+RS621,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""one step-down""}",0.077222
+RS622,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""total""}",304.884941
+RS623,RN36,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""per-lag check""}",7.773412
+RS624,RN36,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""polynomials""}",1.329407
+RS625,RN36,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""cancellation""}",1.4004365
+RS626,RN36,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""bisection""}",13.0551505
+RS627,RN36,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""one step-down""}",12.546624
+RS628,RN36,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""total""}",17.0724305
+RS629,RN36,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""per-lag check""}",10.4994025
+RS630,RN37,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS"", ""models"": 100}",0
+RS631,RN37,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS"", ""inadmissible"": 32, ""models"": 100}",8.887172697757961e-07
+RS632,RN37,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS"", ""models"": 100}",0
+RS633,RN37,max abs difference between three calls of the C++ core on the same model,"{""family"": ""ETS"", ""models"": 100}",0.0
+RS634,RN37,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS high degree"", ""models"": 100}",0
+RS635,RN37,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS high degree"", ""inadmissible"": 47, ""models"": 100}",9.419569204638378e-07
+RS636,RN37,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS high degree"", ""models"": 100}",0
+RS637,RN37,max abs difference between three calls of the C++ core on the same model,"{""family"": ""ETS high degree"", ""models"": 100}",0.0
+RS638,RN37,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM identity"", ""models"": 100}",0
+RS639,RN37,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM identity"", ""inadmissible"": 39, ""models"": 100}",9.354648804471566e-07
+RS640,RN37,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM identity"", ""models"": 100}",0
+RS641,RN37,max abs difference between three calls of the C++ core on the same model,"{""family"": ""GUM identity"", ""models"": 100}",0.0
+RS642,RN37,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM random"", ""models"": 100}",0
+RS643,RN37,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM random"", ""inadmissible"": 20, ""models"": 100}",9.467602093415906e-07
+RS644,RN37,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM random"", ""models"": 100}",0
+RS645,RN37,max abs difference between three calls of the C++ core on the same model,"{""family"": ""GUM random"", ""models"": 100}",0.0
+RS646,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""polynomials""}",0.4219425
+RS647,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""cancellation""}",0.766284
+RS648,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""bisection""}",0.161574
+RS649,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""one step-down""}",0.105252
+RS650,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""total""}",1.5445445
+RS651,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A), m=12"", ""step"": ""per-lag check""}",7.5743445
+RS652,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""polynomials""}",1.2576265
+RS653,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""cancellation""}",40.8313345
+RS654,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""bisection""}",11.8799595
+RS655,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""one step-down""}",9.663539
+RS656,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""total""}",45.031372
+RS657,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168"", ""step"": ""per-lag check""}",11.556666
+RS658,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""polynomials""}",1.44001
+RS659,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""cancellation""}",37.0502775
+RS660,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""bisection""}",178.452721
+RS661,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""one step-down""}",0.112481
+RS662,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""total""}",193.309471
+RS663,RN38,"mean time at the C++ level, microseconds","{""model"": ""ETS(A,N,A,A), m=24 and 168, inadmissible"", ""step"": ""per-lag check""}",8.2230905
+RS664,RN38,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""polynomials""}",1.39357
+RS665,RN38,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""cancellation""}",1.475284
+RS666,RN38,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""bisection""}",13.1934885
+RS667,RN38,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""one step-down""}",12.1624835
+RS668,RN38,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""total""}",17.6050595
+RS669,RN38,"mean time at the C++ level, microseconds","{""model"": ""GUM, orders (1,1,1), lags (1,24,168)"", ""step"": ""per-lag check""}",7.883059
+RS670,RN39,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS"", ""models"": 100}",0
+RS671,RN39,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS"", ""inadmissible"": 32, ""models"": 100}",8.887172697757961e-07
+RS672,RN39,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS"", ""models"": 100}",0
+RS673,RN39,max abs difference between three calls of the C++ core on the same model,"{""family"": ""ETS"", ""models"": 100}",0.0
+RS674,RN39,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS high degree"", ""models"": 100}",0
+RS675,RN39,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS high degree"", ""inadmissible"": 47, ""models"": 100}",9.419569204638378e-07
+RS676,RN39,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS high degree"", ""models"": 100}",0
+RS677,RN39,max abs difference between three calls of the C++ core on the same model,"{""family"": ""ETS high degree"", ""models"": 100}",0.0
+RS678,RN39,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM identity"", ""models"": 100}",0
+RS679,RN39,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM identity"", ""inadmissible"": 39, ""models"": 100}",9.354648804471566e-07
+RS680,RN39,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM identity"", ""models"": 100}",0
+RS681,RN39,max abs difference between three calls of the C++ core on the same model,"{""family"": ""GUM identity"", ""models"": 100}",0.0
+RS682,RN39,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM random"", ""models"": 100}",0
+RS683,RN39,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM random"", ""inadmissible"": 20, ""models"": 100}",9.467602093415906e-07
+RS684,RN39,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM random"", ""models"": 100}",0
+RS685,RN39,max abs difference between three calls of the C++ core on the same model,"{""family"": ""GUM random"", ""models"": 100}",0.0
+RS686,RN40,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,N)""}",5.29999999999973
+RS687,RN40,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,N)""}",5.89999999999975
+RS688,RN40,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,N)""}",5.10000000000019
+RS689,RN40,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,N)""}",5.14999999999972
+RS690,RN40,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A), m=12""}",4.70000000000041
+RS691,RN40,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A), m=12""}",7.45000000000005
+RS692,RN40,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,A), m=12""}",5.44999999999973
+RS693,RN40,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,A), m=12""}",7.20000000000027
+RS694,RN40,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",6.94999999999979
+RS695,RN40,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",54.0500000000002
+RS696,RN40,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",5.64999999999998
+RS697,RN40,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",7.05000000000027
+RS698,RN40,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",6.94999999999979
+RS699,RN40,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",9.40000000000012
+RS700,RN40,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",5.45000000000044
+RS701,RN40,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",23.0000000000004
+RS702,RN40,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.0969999999999942
+RS703,RN40,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS704,RN40,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",200.413223140484
+RS705,RN40,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.162999999999997
+RS706,RN40,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS707,RN40,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",169.087136929457
+RS708,RN40,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.0520000000000067
+RS709,RN40,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS710,RN40,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",320.987654321029
+RS711,RN40,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",0.143999999999991
+RS712,RN40,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS713,RN40,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",1180.32786885239
+RS714,RN40,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.0599999999999881
+RS715,RN40,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",324
+RS716,RN40,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",185.185185185148
+RS717,RN40,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.0799999999999983
+RS718,RN40,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS719,RN40,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",40
+RS720,RN40,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",165.289256198344
+RS721,RN40,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.194999999999993
+RS722,RN40,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS723,RN40,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",43
+RS724,RN40,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",202.282157676341
+RS725,RN40,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.0459999999999923
+RS726,RN40,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS727,RN40,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",60
+RS728,RN40,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",283.950617283903
+RS729,RN40,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",0.155999999999992
+RS730,RN40,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS731,RN40,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",52
+RS732,RN40,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",1278.6885245901
+RS733,RN40,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.0559999999999974
+RS734,RN40,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",310
+RS735,RN40,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",68
+RS736,RN40,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",180.645161290314
+RS737,RN41,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,N)""}",4.84999999999971
+RS738,RN41,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,N)""}",4.84999999999971
+RS739,RN41,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,N)""}",5.04999999999995
+RS740,RN41,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,N)""}",5.49999999999997
+RS741,RN41,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A), m=12""}",4.74999999999994
+RS742,RN41,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A), m=12""}",6.09999999999999
+RS743,RN41,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,Ad,A), m=12""}",5.2500000000002
+RS744,RN41,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,Ad,A), m=12""}",8.40000000000032
+RS745,RN41,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",8.14999999999984
+RS746,RN41,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""ETS(A,N,A,A), m=24 and 168""}",63.8500000000001
+RS747,RN41,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",5.34999999999997
+RS748,RN41,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1), lags (1,12)""}",6.80000000000049
+RS749,RN41,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",8.35000000000008
+RS750,RN41,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (2,2), lags (1,12)""}",10.0500000000004
+RS751,RN41,"mean time per call, microseconds","{""check"": ""per-lag"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",6.64999999999978
+RS752,RN41,"mean time per call, microseconds","{""check"": ""polynomial"", ""model"": ""GUM, orders (1,1,1), lags (1,24,168)""}",23.2000000000006
+RS753,RN41,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.0869999999999891
+RS754,RN41,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS755,RN41,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",179.75206611568
+RS756,RN41,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.172000000000011
+RS757,RN41,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS758,RN41,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",178.423236514534
+RS759,RN41,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.0490000000000066
+RS760,RN41,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS761,RN41,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",302.46913580251
+RS762,RN41,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",0.132000000000005
+RS763,RN41,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS764,RN41,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",1081.96721311479
+RS765,RN41,"time of the fit, seconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.0589999999999975
+RS766,RN41,calls of smoothEigens() in the fit,"{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",324
+RS767,RN41,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""per-lag"", ""fit"": ""ces(AirPassengers, \""full\"")""}",182.098765432091
+RS768,RN41,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",0.0840000000000032
+RS769,RN41,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",484
+RS770,RN41,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",40
+RS771,RN41,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(1,1), lags=c(1,12))""}",173.553719008271
+RS772,RN41,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",0.167000000000002
+RS773,RN41,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",964
+RS774,RN41,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",43
+RS775,RN41,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""gum(AirPassengers, orders=c(2,1), lags=c(1,12))""}",173.236514522823
+RS776,RN41,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",0.0439999999999969
+RS777,RN41,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",162
+RS778,RN41,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",60
+RS779,RN41,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(AirPassengers, \""AAdA\"")""}",271.604938271586
+RS780,RN41,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",0.153000000000006
+RS781,RN41,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",122
+RS782,RN41,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",52
+RS783,RN41,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""adam(hourly, \""ANA\"", lags=c(24,168))""}",1254.09836065579
+RS784,RN41,"time of the fit, seconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",0.0529999999999973
+RS785,RN41,calls of smoothEigens() in the fit,"{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",310
+RS786,RN41,calls of smoothEigens() on inadmissible parameters in the fit,"{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",68
+RS787,RN41,"time of the fit per call of smoothEigens(), microseconds","{""check"": ""polynomial"", ""fit"": ""ces(AirPassengers, \""full\"")""}",170.967741935475
+RS788,RN42,largest nonzero eigenvalue modulus of the book's per-lag discount matrices,"{""alpha"": 0.1, ""gamma"": 0.1, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.9
+RS789,RN42,effect of the initial states on the fitted value at the last period,"{""alpha"": 0.1, ""gamma"": 0.1, ""m"": 12, ""model"": ""ETS(A,N,A)"", ""period"": 2400}",1.1870393556989711e-11
+RS790,RN42,growth of the effect of the initial states per period over the second half,"{""alpha"": 0.1, ""gamma"": 0.1, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.9895781239569994
+RS791,RN42,largest root modulus of the cancelled MA polynomial,"{""alpha"": 0.1, ""gamma"": 0.1, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.9911267448787717
+RS792,RN42,largest nonzero eigenvalue modulus of the book's per-lag discount matrices,"{""alpha"": 1.2, ""gamma"": 0.9, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.19999999999999996
+RS793,RN42,effect of the initial states on the fitted value at the last period,"{""alpha"": 1.2, ""gamma"": 0.9, ""m"": 12, ""model"": ""ETS(A,N,A)"", ""period"": 2400}",5.968778912343606e+16
+RS794,RN42,growth of the effect of the initial states per period over the second half,"{""alpha"": 1.2, ""gamma"": 0.9, ""m"": 12, ""model"": ""ETS(A,N,A)""}",1.0163934504137493
+RS795,RN42,largest root modulus of the cancelled MA polynomial,"{""alpha"": 1.2, ""gamma"": 0.9, ""m"": 12, ""model"": ""ETS(A,N,A)""}",1.0164568117563233
+RS796,RN43,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS"", ""models"": 200}",0
+RS797,RN43,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS"", ""inadmissible"": 86, ""models"": 200}",9.48848823512094e-07
+RS798,RN43,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS"", ""models"": 200}",0
+RS799,RN43,max abs difference between three calls of the C++ core on the same model,"{""family"": ""ETS"", ""models"": 200}",0.0
+RS800,RN43,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""ETS high degree"", ""models"": 200}",0
+RS801,RN43,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""ETS high degree"", ""inadmissible"": 95, ""models"": 200}",9.526633371059745e-07
+RS802,RN43,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""ETS high degree"", ""models"": 200}",0
+RS803,RN43,max abs difference between three calls of the C++ core on the same model,"{""family"": ""ETS high degree"", ""models"": 200}",0.0
+RS804,RN43,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM identity"", ""models"": 200}",0
+RS805,RN43,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM identity"", ""inadmissible"": 84, ""models"": 200}",9.405809149320987e-07
+RS806,RN43,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM identity"", ""models"": 200}",0
+RS807,RN43,max abs difference between three calls of the C++ core on the same model,"{""family"": ""GUM identity"", ""models"": 200}",0.0
+RS808,RN43,admissibility decisions of the C++ core that differ from the prototype,"{""family"": ""GUM random"", ""models"": 200}",0
+RS809,RN43,"max abs difference of the largest root modulus on inadmissible models, C++ core against prototype","{""family"": ""GUM random"", ""inadmissible"": 27, ""models"": 200}",9.485389538266276e-07
+RS810,RN43,"models whose cancelled polynomials differ in degree, C++ core against prototype","{""family"": ""GUM random"", ""models"": 200}",0
+RS811,RN43,max abs difference between three calls of the C++ core on the same model,"{""family"": ""GUM random"", ""models"": 200}",0.0
+RS812,RN44,largest nonzero eigenvalue modulus of the book's per-lag discount matrices,"{""alpha"": 0.1, ""gamma"": 0.1, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.9
+RS813,RN44,effect of the initial states on the fitted value at the last period,"{""alpha"": 0.1, ""gamma"": 0.1, ""m"": 12, ""model"": ""ETS(A,N,A)"", ""period"": 2400}",1.1870393556989711e-11
+RS814,RN44,growth of the effect of the initial states per period over the second half,"{""alpha"": 0.1, ""gamma"": 0.1, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.9895781239569994
+RS815,RN44,growth of the weight of an observation per period over the second half,"{""alpha"": 0.1, ""gamma"": 0.1, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.9909168445987553
+RS816,RN44,largest root modulus of the cancelled MA polynomial,"{""alpha"": 0.1, ""gamma"": 0.1, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.9911267448787717
+RS817,RN44,largest nonzero eigenvalue modulus of the book's per-lag discount matrices,"{""alpha"": 1.2, ""gamma"": 0.9, ""m"": 12, ""model"": ""ETS(A,N,A)""}",0.19999999999999996
+RS818,RN44,effect of the initial states on the fitted value at the last period,"{""alpha"": 1.2, ""gamma"": 0.9, ""m"": 12, ""model"": ""ETS(A,N,A)"", ""period"": 2400}",5.968778912343606e+16
+RS819,RN44,growth of the effect of the initial states per period over the second half,"{""alpha"": 1.2, ""gamma"": 0.9, ""m"": 12, ""model"": ""ETS(A,N,A)""}",1.0163934504137493
+RS820,RN44,growth of the weight of an observation per period over the second half,"{""alpha"": 1.2, ""gamma"": 0.9, ""m"": 12, ""model"": ""ETS(A,N,A)""}",1.0163629094999396
+RS821,RN44,largest root modulus of the cancelled MA polynomial,"{""alpha"": 1.2, ""gamma"": 0.9, ""m"": 12, ""model"": ""ETS(A,N,A)""}",1.0164568117563233
+RS822,RN46,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 300}",103
+RS823,RN46,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 300}",63
+RS824,RN46,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 300}",40
+RS825,RN46,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 300}",0
+RS826,RN46,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 300}",0
+RS827,RN46,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 300}",0
+RS828,RN46,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 201}",1.787459069646502e-13
+RS829,RN46,models found admissible by the PBH reference,"{""family"": ""ETS+ARIMA"", ""models"": 300}",99
+RS830,RN46,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 300}",96
+RS831,RN46,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 300}",80
+RS832,RN46,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 300}",16
+RS833,RN46,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 300}",0
+RS834,RN46,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 300}",0
+RS835,RN46,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 300}",0
+RS836,RN46,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 254}",2.2861712523081223e-11
+RS837,RN46,models found admissible by the PBH reference,"{""family"": ""ETS+SARIMA"", ""models"": 300}",46
+RS838,RN46,max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials,"{""models"": 600}",2.645948669922877e-15
+RS839,RN46,models accepted by the check and rejected by the PBH reference,"{""alpha"": ""-1 to 3 by 0.1"", ""check"": ""split"", ""family"": ""ETS(A,N,N)+MA(1) grid"", ""models"": 1599, ""theta"": ""-0.95 to 0.95 by 0.05""}",190
+RS840,RN46,models rejected by the check and accepted by the PBH reference,"{""alpha"": ""-1 to 3 by 0.1"", ""check"": ""split"", ""family"": ""ETS(A,N,N)+MA(1) grid"", ""models"": 1599, ""theta"": ""-0.95 to 0.95 by 0.05""}",154
+RS841,RN46,models accepted by the check and rejected by the PBH reference,"{""alpha"": ""-1 to 3 by 0.1"", ""check"": ""joint"", ""family"": ""ETS(A,N,N)+MA(1) grid"", ""models"": 1599, ""theta"": ""-0.95 to 0.95 by 0.05""}",0
+RS842,RN46,models rejected by the check and accepted by the PBH reference,"{""alpha"": ""-1 to 3 by 0.1"", ""check"": ""joint"", ""family"": ""ETS(A,N,N)+MA(1) grid"", ""models"": 1599, ""theta"": ""-0.95 to 0.95 by 0.05""}",0
+RS843,RN46,"largest modulus of the whole model, PBH reference","{""alpha"": 1.9, ""model"": ""ETS(A,N,N)+MA(1)"", ""split check"": ""admissible"", ""theta"": 0.1}",1.0916079783099617
+RS844,RN46,models whose component lags differ from those of adam(),"{""models"": 8}",0
+RS845,RN46,max abs difference between the matrices built here and those of adam(),"{""models"": 8}",1.2373498816542077
+RS846,RN47,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 300}",103
+RS847,RN47,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 300}",63
+RS848,RN47,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 300}",40
+RS849,RN47,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 300}",0
+RS850,RN47,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 300}",0
+RS851,RN47,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 300}",0
+RS852,RN47,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 201}",1.787459069646502e-13
+RS853,RN47,models found admissible by the PBH reference,"{""family"": ""ETS+ARIMA"", ""models"": 300}",99
+RS854,RN47,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 300}",96
+RS855,RN47,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 300}",80
+RS856,RN47,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 300}",16
+RS857,RN47,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 300}",0
+RS858,RN47,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 300}",0
+RS859,RN47,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 300}",0
+RS860,RN47,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 254}",2.2861712523081223e-11
+RS861,RN47,models found admissible by the PBH reference,"{""family"": ""ETS+SARIMA"", ""models"": 300}",46
+RS862,RN47,max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials,"{""models"": 600}",2.645948669922877e-15
+RS863,RN47,models whose component lags differ from those of adam(),"{""models"": 8}",0
+RS864,RN47,max abs difference between the matrices built here and those of adam(),"{""models"": 8}",1.2373498816542077
+RS865,RN48,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 300}",103
+RS866,RN48,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 300}",63
+RS867,RN48,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 300}",40
+RS868,RN48,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 300}",0
+RS869,RN48,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 300}",0
+RS870,RN48,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 300}",0
+RS871,RN48,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 201}",1.787459069646502e-13
+RS872,RN48,models found admissible by the PBH reference,"{""family"": ""ETS+ARIMA"", ""models"": 300}",99
+RS873,RN48,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 300}",96
+RS874,RN48,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 300}",80
+RS875,RN48,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 300}",16
+RS876,RN48,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 300}",0
+RS877,RN48,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 300}",0
+RS878,RN48,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 300}",0
+RS879,RN48,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 254}",2.2861712523081223e-11
+RS880,RN48,models found admissible by the PBH reference,"{""family"": ""ETS+SARIMA"", ""models"": 300}",46
+RS881,RN48,max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials,"{""models"": 600}",2.645948669922877e-15
+RS882,RN48,models whose component lags differ from those of adam(),"{""models"": 8}",0
+RS883,RN48,max abs difference between the matrices built here and those of adam(),"{""models"": 8}",4.440892098500626e-15
+RS884,RN49,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 500}",166
+RS885,RN49,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 500}",104
+RS886,RN49,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 500}",62
+RS887,RN49,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 500}",0
+RS888,RN49,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 500}",0
+RS889,RN49,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 500}",0
+RS890,RN49,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 341}",4.3076653355456074e-13
+RS891,RN49,models found admissible by the PBH reference,"{""family"": ""ETS+ARIMA"", ""models"": 500}",159
+RS892,RN49,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 500}",159
+RS893,RN49,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 500}",128
+RS894,RN49,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 500}",31
+RS895,RN49,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 500}",0
+RS896,RN49,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 500}",0
+RS897,RN49,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 500}",0
+RS898,RN49,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 413}",1.6268764113647194e-11
+RS899,RN49,models found admissible by the PBH reference,"{""family"": ""ETS+SARIMA"", ""models"": 500}",87
+RS900,RN49,max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials,"{""models"": 1000}",2.8171909249863347e-15
+RS901,RN49,models whose component lags differ from those of adam(),"{""models"": 20}",0
+RS902,RN49,max abs difference between the matrices built here and those of adam(),"{""models"": 20}",4.440892098500626e-15
+RS903,RN50,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 500}",166
+RS904,RN50,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 500}",104
+RS905,RN50,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 500}",62
+RS906,RN50,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 500}",0
+RS907,RN50,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 500}",0
+RS908,RN50,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 500}",0
+RS909,RN50,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 341}",4.3076653355456074e-13
+RS910,RN50,models found admissible by the PBH reference,"{""family"": ""ETS+ARIMA"", ""models"": 500}",159
+RS911,RN50,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 500}",159
+RS912,RN50,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 500}",128
+RS913,RN50,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 500}",31
+RS914,RN50,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 500}",0
+RS915,RN50,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 500}",0
+RS916,RN50,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 500}",0
+RS917,RN50,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 413}",1.6268764113647194e-11
+RS918,RN50,models found admissible by the PBH reference,"{""family"": ""ETS+SARIMA"", ""models"": 500}",87
+RS919,RN50,max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials,"{""models"": 1000}",2.8171909249863347e-15
+RS920,RN50,models whose component lags differ from those of adam(),"{""models"": 20}",0
+RS921,RN50,max abs difference between the matrices built here and those of adam(),"{""models"": 20}",4.440892098500626e-15
+RS922,RN52,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 50}",18
+RS923,RN52,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 50}",11
+RS924,RN52,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 50}",7
+RS925,RN52,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 50}",0
+RS926,RN52,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 50}",0
+RS927,RN52,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 50}",0
+RS928,RN52,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 32}",4.773959005888173e-14
+RS929,RN52,models found admissible by the PBH reference,"{""family"": ""ETS+ARIMA"", ""models"": 50}",18
+RS930,RN52,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 50}",15
+RS931,RN52,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 50}",14
+RS932,RN52,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 50}",1
+RS933,RN52,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 50}",0
+RS934,RN52,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 50}",0
+RS935,RN52,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 50}",0
+RS936,RN52,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 45}",6.18620044079421e-10
+RS937,RN52,models found admissible by the PBH reference,"{""family"": ""ETS+SARIMA"", ""models"": 50}",5
+RS938,RN52,max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials,"{""models"": 100}",2.2824350017362026e-15
+RS939,RN52,admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model,"{""family"": ""ETS+ARIMA"", ""language"": ""R"", ""models"": 50}",0
+RS940,RN52,"max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 32, ""language"": ""R"", ""models"": 50}",9.288192708289955e-07
+RS941,RN52,admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model,"{""family"": ""ETS+ARIMA"", ""language"": ""Python"", ""models"": 50}",0
+RS942,RN52,"max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 32, ""language"": ""Python"", ""models"": 50}",9.288192690526387e-07
+RS943,RN52,admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model,"{""family"": ""ETS+SARIMA"", ""language"": ""R"", ""models"": 50}",0
+RS944,RN52,"max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 45, ""language"": ""R"", ""models"": 50}",9.417483404217109e-07
+RS945,RN52,admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model,"{""family"": ""ETS+SARIMA"", ""language"": ""Python"", ""models"": 50}",0
+RS946,RN52,"max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 45, ""language"": ""Python"", ""models"": 50}",9.417483419760231e-07
+RS947,RN53,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 500}",171
+RS948,RN53,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 500}",115
+RS949,RN53,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 500}",56
+RS950,RN53,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 500}",0
+RS951,RN53,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 500}",0
+RS952,RN53,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 500}",0
+RS953,RN53,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 341}",1.3655743202889425e-13
+RS954,RN53,models found admissible by the PBH reference,"{""family"": ""ETS+ARIMA"", ""models"": 500}",159
+RS955,RN53,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 500}",150
+RS956,RN53,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 500}",129
+RS957,RN53,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 500}",21
+RS958,RN53,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 500}",0
+RS959,RN53,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 500}",0
+RS960,RN53,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 500}",0
+RS961,RN53,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 424}",6.726019741165601e-11
+RS962,RN53,models found admissible by the PBH reference,"{""family"": ""ETS+SARIMA"", ""models"": 500}",76
+RS963,RN53,max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials,"{""models"": 1000}",2.6922908347160046e-15
+RS964,RN53,admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model,"{""family"": ""ETS+ARIMA"", ""language"": ""R"", ""models"": 500}",0
+RS965,RN53,"max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 341, ""language"": ""R"", ""models"": 500}",9.53674319736919e-07
+RS966,RN53,admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model,"{""family"": ""ETS+ARIMA"", ""language"": ""Python"", ""models"": 500}",0
+RS967,RN53,"max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 341, ""language"": ""Python"", ""models"": 500}",9.536743161842054e-07
+RS968,RN53,admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model,"{""family"": ""ETS+SARIMA"", ""language"": ""R"", ""models"": 500}",0
+RS969,RN53,"max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 424, ""language"": ""R"", ""models"": 500}",9.484902201428724e-07
+RS970,RN53,admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model,"{""family"": ""ETS+SARIMA"", ""language"": ""Python"", ""models"": 500}",0
+RS971,RN53,"max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 424, ""language"": ""Python"", ""models"": 500}",9.484902243617199e-07
+RS972,RN55,median fit time,"{""check"": ""split"", ""model"": ""ARIMA(1,1,1)(1,1,1)[12]"", ""repeats"": 5}",0.0690000000000002
+RS973,RN55,log-likelihood of the fit,"{""check"": ""split"", ""model"": ""ARIMA(1,1,1)(1,1,1)[12]"", ""repeats"": 5}",-541.844444789273
+RS974,RN55,median fit time,"{""check"": ""split"", ""model"": ""ETS(A,N,A)+ARIMA(1,0,1)"", ""repeats"": 5}",0.0649999999999999
+RS975,RN55,log-likelihood of the fit,"{""check"": ""split"", ""model"": ""ETS(A,N,A)+ARIMA(1,0,1)"", ""repeats"": 5}",-569.649169125733
+RS976,RN55,median fit time,"{""check"": ""split"", ""model"": ""ETS(A,Ad,N)+ARIMA(0,1,2)"", ""repeats"": 5}",0.116
+RS977,RN55,log-likelihood of the fit,"{""check"": ""split"", ""model"": ""ETS(A,Ad,N)+ARIMA(0,1,2)"", ""repeats"": 5}",-255.264423392167
+RS978,RN55,median fit time,"{""check"": ""split"", ""model"": ""ssarima (1,1,1)(1,1,1)[12]"", ""repeats"": 5}",0.101
+RS979,RN55,log-likelihood of the fit,"{""check"": ""split"", ""model"": ""ssarima (1,1,1)(1,1,1)[12]"", ""repeats"": 5}",-556.990376211077
+RS980,RN55,median fit time,"{""check"": ""whole"", ""model"": ""ARIMA(1,1,1)(1,1,1)[12]"", ""repeats"": 5}",0.103
+RS981,RN55,log-likelihood of the fit,"{""check"": ""whole"", ""model"": ""ARIMA(1,1,1)(1,1,1)[12]"", ""repeats"": 5}",-541.382357389734
+RS982,RN55,median fit time,"{""check"": ""whole"", ""model"": ""ETS(A,N,A)+ARIMA(1,0,1)"", ""repeats"": 5}",0.0529999999999999
+RS983,RN55,log-likelihood of the fit,"{""check"": ""whole"", ""model"": ""ETS(A,N,A)+ARIMA(1,0,1)"", ""repeats"": 5}",-572.214179521351
+RS984,RN55,median fit time,"{""check"": ""whole"", ""model"": ""ETS(A,Ad,N)+ARIMA(0,1,2)"", ""repeats"": 5}",0.0649999999999999
+RS985,RN55,log-likelihood of the fit,"{""check"": ""whole"", ""model"": ""ETS(A,Ad,N)+ARIMA(0,1,2)"", ""repeats"": 5}",-255.264424161103
+RS986,RN55,median fit time,"{""check"": ""whole"", ""model"": ""ssarima (1,1,1)(1,1,1)[12]"", ""repeats"": 5}",0.179
+RS987,RN55,log-likelihood of the fit,"{""check"": ""whole"", ""model"": ""ssarima (1,1,1)(1,1,1)[12]"", ""repeats"": 5}",-556.990376211077
+RS988,RN56,median fit time,"{""check"": ""split"", ""model"": ""ARIMA(1,1,1)(1,1,1)[12]"", ""repeats"": 5}",0.0700000000000001
+RS989,RN56,log-likelihood of the fit,"{""check"": ""split"", ""model"": ""ARIMA(1,1,1)(1,1,1)[12]"", ""repeats"": 5}",-541.844444789273
+RS990,RN56,median fit time,"{""check"": ""split"", ""model"": ""ETS(A,N,A)+ARIMA(1,0,1)"", ""repeats"": 5}",0.0669999999999997
+RS991,RN56,log-likelihood of the fit,"{""check"": ""split"", ""model"": ""ETS(A,N,A)+ARIMA(1,0,1)"", ""repeats"": 5}",-569.649169125733
+RS992,RN56,median fit time,"{""check"": ""split"", ""model"": ""ETS(A,Ad,N)+ARIMA(0,1,2)"", ""repeats"": 5}",0.0779999999999998
+RS993,RN56,log-likelihood of the fit,"{""check"": ""split"", ""model"": ""ETS(A,Ad,N)+ARIMA(0,1,2)"", ""repeats"": 5}",-255.264423392167
+RS994,RN56,median fit time,"{""check"": ""split"", ""model"": ""ssarima (1,1,1)(1,1,1)[12]"", ""repeats"": 5}",0.0799999999999996
+RS995,RN56,log-likelihood of the fit,"{""check"": ""split"", ""model"": ""ssarima (1,1,1)(1,1,1)[12]"", ""repeats"": 5}",-556.990376211077
+RS996,RN56,median fit time,"{""check"": ""whole"", ""model"": ""ARIMA(1,1,1)(1,1,1)[12]"", ""repeats"": 5}",0.0740000000000001
+RS997,RN56,log-likelihood of the fit,"{""check"": ""whole"", ""model"": ""ARIMA(1,1,1)(1,1,1)[12]"", ""repeats"": 5}",-541.382357389734
+RS998,RN56,median fit time,"{""check"": ""whole"", ""model"": ""ETS(A,N,A)+ARIMA(1,0,1)"", ""repeats"": 5}",0.0640000000000001
+RS999,RN56,log-likelihood of the fit,"{""check"": ""whole"", ""model"": ""ETS(A,N,A)+ARIMA(1,0,1)"", ""repeats"": 5}",-572.214179521351
+RS1000,RN56,median fit time,"{""check"": ""whole"", ""model"": ""ETS(A,Ad,N)+ARIMA(0,1,2)"", ""repeats"": 5}",0.0780000000000003
+RS1001,RN56,log-likelihood of the fit,"{""check"": ""whole"", ""model"": ""ETS(A,Ad,N)+ARIMA(0,1,2)"", ""repeats"": 5}",-255.264424161103
+RS1002,RN56,median fit time,"{""check"": ""whole"", ""model"": ""ssarima (1,1,1)(1,1,1)[12]"", ""repeats"": 5}",0.0829999999999997
+RS1003,RN56,log-likelihood of the fit,"{""check"": ""whole"", ""model"": ""ssarima (1,1,1)(1,1,1)[12]"", ""repeats"": 5}",-556.990376211077
+AC3.RS1,AC3.RN1,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 200}",65
+AC3.RS2,AC3.RN1,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 200}",42
+AC3.RS3,AC3.RN1,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 200}",23
+AC3.RS4,AC3.RN1,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 200}",0
+AC3.RS5,AC3.RN1,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 200}",0
+AC3.RS6,AC3.RN1,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 200}",0
+AC3.RS7,AC3.RN1,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 133}",2.899902540320909e-13
+AC3.RS8,AC3.RN1,models found admissible by the PBH reference,"{""family"": ""ETS+ARIMA"", ""models"": 200}",67
+AC3.RS9,AC3.RN1,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 200}",71
+AC3.RS10,AC3.RN1,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 200}",64
+AC3.RS11,AC3.RN1,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 200}",7
+AC3.RS12,AC3.RN1,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 200}",0
+AC3.RS13,AC3.RN1,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 200}",0
+AC3.RS14,AC3.RN1,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 200}",0
+AC3.RS15,AC3.RN1,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 173}",1.5218937221561646e-12
+AC3.RS16,AC3.RN1,models found admissible by the PBH reference,"{""family"": ""ETS+SARIMA"", ""models"": 200}",27
+AC3.RS17,AC3.RN1,max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials,"{""models"": 400}",2.192690473634684e-15
+AC3.RS18,AC3.RN1,models whose component lags differ from those of adam(),"{""models"": 30}",0
+AC3.RS19,AC3.RN1,max abs difference between the matrices built here and those of adam(),"{""models"": 30}",4.884981308350689e-15
+AC3.RS20,AC3.RN2,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 200}",67
+AC3.RS21,AC3.RN2,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 200}",42
+AC3.RS22,AC3.RN2,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+ARIMA"", ""models"": 200}",25
+AC3.RS23,AC3.RN2,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 200}",0
+AC3.RS24,AC3.RN2,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 200}",0
+AC3.RS25,AC3.RN2,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+ARIMA"", ""models"": 200}",0
+AC3.RS26,AC3.RN2,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 118}",7.858158568296858e-13
+AC3.RS27,AC3.RN2,models found admissible by the PBH reference,"{""family"": ""ETS+ARIMA"", ""models"": 200}",82
+AC3.RS28,AC3.RN2,models whose admissibility decision differs from the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 200}",58
+AC3.RS29,AC3.RN2,models accepted by the check and rejected by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 200}",51
+AC3.RS30,AC3.RN2,models rejected by the check and accepted by the PBH reference,"{""check"": ""split"", ""family"": ""ETS+SARIMA"", ""models"": 200}",7
+AC3.RS31,AC3.RN2,models whose admissibility decision differs from the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 200}",0
+AC3.RS32,AC3.RN2,models accepted by the check and rejected by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 200}",0
+AC3.RS33,AC3.RN2,models rejected by the check and accepted by the PBH reference,"{""check"": ""joint"", ""family"": ""ETS+SARIMA"", ""models"": 200}",0
+AC3.RS34,AC3.RN2,"max abs difference of the largest modulus, check of the whole model against the PBH reference, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 167}",5.682290193931294e-09
+AC3.RS35,AC3.RN2,models found admissible by the PBH reference,"{""family"": ""ETS+SARIMA"", ""models"": 200}",33
+AC3.RS36,AC3.RN2,max abs difference between the ARIMA form of the ARIMA part and its ARI and MA polynomials,"{""models"": 400}",3.497202527569243e-15
+AC3.RS37,AC3.RN2,admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model,"{""family"": ""ETS+ARIMA"", ""language"": ""R"", ""models"": 200}",0
+AC3.RS38,AC3.RN2,"max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 118, ""language"": ""R"", ""models"": 200}",9.353759296004682e-07
+AC3.RS39,AC3.RN2,admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model,"{""family"": ""ETS+ARIMA"", ""language"": ""Python"", ""models"": 200}",0
+AC3.RS40,AC3.RN2,"max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible","{""family"": ""ETS+ARIMA"", ""inadmissible"": 118, ""language"": ""Python"", ""models"": 200}",9.353759327090927e-07
+AC3.RS41,AC3.RN2,admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model,"{""family"": ""ETS+SARIMA"", ""language"": ""R"", ""models"": 200}",0
+AC3.RS42,AC3.RN2,"max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 167, ""language"": ""R"", ""models"": 200}",9.529402862362701e-07
+AC3.RS43,AC3.RN2,admissibility decisions of the package's bounds checker that differ from the prototype check of the whole model,"{""family"": ""ETS+SARIMA"", ""language"": ""Python"", ""models"": 200}",0
+AC3.RS44,AC3.RN2,"max abs difference of the largest modulus, package's bounds checker against the prototype, on models both find inadmissible","{""family"": ""ETS+SARIMA"", ""inadmissible"": 167, ""language"": ""Python"", ""models"": 200}",9.529402831276457e-07
+AC3.RS45,AC3.RN3,"coefficient of B^0 in theta (MA polynomial) of the whole ETS(A,N,N)+MA(1)","{""alpha"": 1.9, ""theta"": 0.1}",1.0
+AC3.RS46,AC3.RN3,"coefficient of B^1 in theta (MA polynomial) of the whole ETS(A,N,N)+MA(1)","{""alpha"": 1.9, ""theta"": 0.1}",1.0
+AC3.RS47,AC3.RN3,"coefficient of B^2 in theta (MA polynomial) of the whole ETS(A,N,N)+MA(1)","{""alpha"": 1.9, ""theta"": 0.1}",-0.1
+AC3.RS48,AC3.RN3,coefficient of B^0 in the product of the parts' MA polynomials,"{""alpha"": 1.9, ""theta"": 0.1}",1.0
+AC3.RS49,AC3.RN3,coefficient of B^1 in the product of the parts' MA polynomials,"{""alpha"": 1.9, ""theta"": 0.1}",1.0
+AC3.RS50,AC3.RN3,coefficient of B^2 in the product of the parts' MA polynomials,"{""alpha"": 1.9, ""theta"": 0.1}",0.09
+AC3.RS51,AC3.RN3,coefficient of B^1 in phi of the whole model,"{""alpha"": 1.9, ""theta"": 0.1}",-1.0
+AC3.RS52,AC3.RN3,smallest root modulus of theta of the whole model,"{""alpha"": 1.9, ""theta"": 0.1}",0.9160797830996159
+AC3.RS53,AC3.RN3,smallest root modulus of the product of the parts' MA polynomials,"{""alpha"": 1.9, ""theta"": 0.1}",1.1111111111111112
+AC3.RS54,AC3.RN3,package smooth_eigens modulus of the whole model,"{""alpha"": 1.9, ""theta"": 0.1}",1.0916080474853516
+AC3.RS55,AC3.RN3,package smooth_eigens modulus of the ETS part alone,"{""alpha"": 1.9}",0.8999999999999999
+AC3.RS56,AC3.RN3,"max |eigenvalue| of D of the whole model (lag 1, so the expanded D)","{""alpha"": 1.9, ""theta"": 0.1}",1.0916079783099617
+AC3.RS57,AC3.RN3,max abs difference between det(I - F L) of the adam() matrices and ari polynomial times (1 - B) per constant/regressor,"{""models"": 57}",7.549516567451064e-15
+AC3.RS58,AC3.RN3,max abs difference between det(I - D L) of the adam() matrices and MA polynomial times (1 - B) per constant/regressor,"{""models"": 57}",1.1546319456101628e-14
+AC3.RS59,AC3.RN3,"pure ARIMA models (plain, constant, static regressor) from adam() with all MA roots outside the unit circle","{""models"": 57}",33.0
+AC3.RS60,AC3.RN3,"of those, models the whole-model check smooth_eigens rejects (shortcut would be wrong)","{""models"": 33}",0.0
+AC3.RS61,AC3.RN3,models from adam() with an MA root on or inside the unit circle (shortcut runs the whole check),"{""models"": 57}",24.0
+AC3.RS62,AC3.RN3,"of those, models the whole-model check accepts (root cancels)","{""models"": 24}",6.0
+AC3.RS63,AC3.RN3,models of the kind,"{""invertible"": 9, ""kind"": ""plain""}",19.0
+AC3.RS64,AC3.RN3,models of the kind,"{""invertible"": 19, ""kind"": ""xreg""}",27.0
+AC3.RS65,AC3.RN3,models of the kind,"{""invertible"": 5, ""kind"": ""constant""}",11.0
+AC3.RS66,AC3.RN4,"models whose root modulus after exact gcd cancellation is within 1e-5 of the unit circle, not on a cyclotomic factor (excluded)","{""models"": 250, ""seed"": 21}",0.0
+AC3.RS67,AC3.RN4,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""author"", ""models"": 250, ""seed"": 21}",0.0
+AC3.RS68,AC3.RN4,"of those, accepted by the check and rejected by the oracle","{""check"": ""author"", ""models"": 250, ""seed"": 21}",0.0
+AC3.RS69,AC3.RN4,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pbh"", ""models"": 250, ""seed"": 21}",0.0
+AC3.RS70,AC3.RN4,"of those, accepted by the check and rejected by the oracle","{""check"": ""pbh"", ""models"": 250, ""seed"": 21}",0.0
+AC3.RS71,AC3.RN4,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pkg"", ""models"": 250, ""seed"": 21}",1.0
+AC3.RS72,AC3.RN4,"of those, accepted by the check and rejected by the oracle","{""check"": ""pkg"", ""models"": 250, ""seed"": 21}",1.0
+AC3.RS73,AC3.RN4,models admissible by the exact oracle,"{""models"": 250, ""seed"": 21}",48.0
+AC3.RS74,AC3.RN4,"models with an MA factor on the unit circle (1+-B, Phi_3, Phi_4, Phi_6 factors at lag 1 or seasonal)","{""models"": 250, ""seed"": 21}",84.0
+AC3.RS75,AC3.RN4,"of those, admissible by the exact oracle (the root cancelled)","{""models"": 250, ""seed"": 21}",3.0
+AC3.RS76,AC3.RN4,"max abs difference of the largest modulus, exact oracle against the author's cancelled polynomial, inadmissible models","{""inadmissible"": 202, ""models"": 250, ""seed"": 21}",3.916032387252244e-09
+AC3.RS77,AC3.RN4,"max abs difference of the largest modulus, exact oracle against the package smooth_eigens, inadmissible models","{""inadmissible"": 202, ""models"": 250, ""seed"": 21}",9.506732854269728e-07
+AC3.RS78,AC3.RN4,largest number of components in a model,"{""models"": 250, ""seed"": 21}",12.0
+AC3.RS79,AC3.RN4,seconds,"{""models"": 250, ""seed"": 21}",36.93316149711609
+AC3.RS80,AC3.RN5,"models whose root modulus after exact gcd cancellation is within 1e-5 of the unit circle, not on a cyclotomic factor (excluded)","{""models"": 250, ""seed"": 22}",0.0
+AC3.RS81,AC3.RN5,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""author"", ""models"": 250, ""seed"": 22}",0.0
+AC3.RS82,AC3.RN5,"of those, accepted by the check and rejected by the oracle","{""check"": ""author"", ""models"": 250, ""seed"": 22}",0.0
+AC3.RS83,AC3.RN5,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pbh"", ""models"": 250, ""seed"": 22}",0.0
+AC3.RS84,AC3.RN5,"of those, accepted by the check and rejected by the oracle","{""check"": ""pbh"", ""models"": 250, ""seed"": 22}",0.0
+AC3.RS85,AC3.RN5,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pkg"", ""models"": 250, ""seed"": 22}",0.0
+AC3.RS86,AC3.RN5,"of those, accepted by the check and rejected by the oracle","{""check"": ""pkg"", ""models"": 250, ""seed"": 22}",0.0
+AC3.RS87,AC3.RN5,models admissible by the exact oracle,"{""models"": 250, ""seed"": 22}",46.0
+AC3.RS88,AC3.RN5,"models with an MA factor on the unit circle (1+-B, Phi_3, Phi_4, Phi_6 factors at lag 1 or seasonal)","{""models"": 250, ""seed"": 22}",82.0
+AC3.RS89,AC3.RN5,"of those, admissible by the exact oracle (the root cancelled)","{""models"": 250, ""seed"": 22}",4.0
+AC3.RS90,AC3.RN5,"max abs difference of the largest modulus, exact oracle against the author's cancelled polynomial, inadmissible models","{""inadmissible"": 204, ""models"": 250, ""seed"": 22}",2.3883504063348937e-09
+AC3.RS91,AC3.RN5,"max abs difference of the largest modulus, exact oracle against the package smooth_eigens, inadmissible models","{""inadmissible"": 204, ""models"": 250, ""seed"": 22}",9.451784697134258e-07
+AC3.RS92,AC3.RN5,largest number of components in a model,"{""models"": 250, ""seed"": 22}",12.0
+AC3.RS93,AC3.RN5,seconds,"{""models"": 250, ""seed"": 22}",34.02397274971008
+AC3.RS94,AC3.RN6,"models whose root modulus after exact gcd cancellation is within 1e-5 of the unit circle, not on a cyclotomic factor (excluded)","{""models"": 250, ""seed"": 23}",0.0
+AC3.RS95,AC3.RN6,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""author"", ""models"": 250, ""seed"": 23}",0.0
+AC3.RS96,AC3.RN6,"of those, accepted by the check and rejected by the oracle","{""check"": ""author"", ""models"": 250, ""seed"": 23}",0.0
+AC3.RS97,AC3.RN6,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pbh"", ""models"": 250, ""seed"": 23}",0.0
+AC3.RS98,AC3.RN6,"of those, accepted by the check and rejected by the oracle","{""check"": ""pbh"", ""models"": 250, ""seed"": 23}",0.0
+AC3.RS99,AC3.RN6,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pkg"", ""models"": 250, ""seed"": 23}",0.0
+AC3.RS100,AC3.RN6,"of those, accepted by the check and rejected by the oracle","{""check"": ""pkg"", ""models"": 250, ""seed"": 23}",0.0
+AC3.RS101,AC3.RN6,models admissible by the exact oracle,"{""models"": 250, ""seed"": 23}",38.0
+AC3.RS102,AC3.RN6,"models with an MA factor on the unit circle (1+-B, Phi_3, Phi_4, Phi_6 factors at lag 1 or seasonal)","{""models"": 250, ""seed"": 23}",77.0
+AC3.RS103,AC3.RN6,"of those, admissible by the exact oracle (the root cancelled)","{""models"": 250, ""seed"": 23}",6.0
+AC3.RS104,AC3.RN6,"max abs difference of the largest modulus, exact oracle against the author's cancelled polynomial, inadmissible models","{""inadmissible"": 212, ""models"": 250, ""seed"": 23}",5.389599877503315e-11
+AC3.RS105,AC3.RN6,"max abs difference of the largest modulus, exact oracle against the package smooth_eigens, inadmissible models","{""inadmissible"": 212, ""models"": 250, ""seed"": 23}",9.536743172944284e-07
+AC3.RS106,AC3.RN6,largest number of components in a model,"{""models"": 250, ""seed"": 23}",12.0
+AC3.RS107,AC3.RN6,seconds,"{""models"": 250, ""seed"": 23}",22.13084840774536
+AC3.RS108,AC3.RN7,"models whose root modulus after exact gcd cancellation is within 1e-5 of the unit circle, not on a cyclotomic factor (excluded)","{""models"": 250, ""seed"": 31}",0.0
+AC3.RS109,AC3.RN7,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""author"", ""models"": 250, ""seed"": 31}",0.0
+AC3.RS110,AC3.RN7,"of those, accepted by the check and rejected by the oracle","{""check"": ""author"", ""models"": 250, ""seed"": 31}",0.0
+AC3.RS111,AC3.RN7,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pbh"", ""models"": 250, ""seed"": 31}",0.0
+AC3.RS112,AC3.RN7,"of those, accepted by the check and rejected by the oracle","{""check"": ""pbh"", ""models"": 250, ""seed"": 31}",0.0
+AC3.RS113,AC3.RN7,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pkg"", ""models"": 250, ""seed"": 31}",0.0
+AC3.RS114,AC3.RN7,"of those, accepted by the check and rejected by the oracle","{""check"": ""pkg"", ""models"": 250, ""seed"": 31}",0.0
+AC3.RS115,AC3.RN7,"models whose reduced theta still has a cyclotomic factor, i.e. a root exactly on the unit circle (inadmissible)","{""models"": 250, ""seed"": 31}",0.0
+AC3.RS116,AC3.RN7,"of those, accepted by the check","{""check"": ""author"", ""models"": 250, ""seed"": 31}",0.0
+AC3.RS117,AC3.RN7,"of those, accepted by the check","{""check"": ""pbh"", ""models"": 250, ""seed"": 31}",0.0
+AC3.RS118,AC3.RN7,"of those, accepted by the check","{""check"": ""pkg"", ""models"": 250, ""seed"": 31}",0.0
+AC3.RS119,AC3.RN7,models admissible by the exact oracle,"{""models"": 250, ""seed"": 31}",46.0
+AC3.RS120,AC3.RN7,"models with an MA factor on the unit circle (1+-B, Phi_3, Phi_4, Phi_6 factors at lag 1 or seasonal)","{""models"": 250, ""seed"": 31}",91.0
+AC3.RS121,AC3.RN7,"of those, admissible by the exact oracle (the root cancelled)","{""models"": 250, ""seed"": 31}",5.0
+AC3.RS122,AC3.RN7,"max abs difference of the largest modulus, exact oracle against the author's cancelled polynomial, inadmissible models","{""inadmissible"": 204, ""models"": 250, ""seed"": 31}",2.7076159092587204e-09
+AC3.RS123,AC3.RN7,"max abs difference of the largest modulus, exact oracle against the package smooth_eigens, inadmissible models","{""inadmissible"": 204, ""models"": 250, ""seed"": 31}",9.529070117419991e-07
+AC3.RS124,AC3.RN7,largest number of components in a model,"{""models"": 250, ""seed"": 31}",12.0
+AC3.RS125,AC3.RN7,seconds,"{""models"": 250, ""seed"": 31}",22.382967948913574
+AC3.RS126,AC3.RN8,"models whose root modulus after exact gcd cancellation is within 1e-5 of the unit circle, not on a cyclotomic factor (excluded)","{""models"": 250, ""seed"": 32}",0.0
+AC3.RS127,AC3.RN8,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""author"", ""models"": 250, ""seed"": 32}",0.0
+AC3.RS128,AC3.RN8,"of those, accepted by the check and rejected by the oracle","{""check"": ""author"", ""models"": 250, ""seed"": 32}",0.0
+AC3.RS129,AC3.RN8,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pbh"", ""models"": 250, ""seed"": 32}",0.0
+AC3.RS130,AC3.RN8,"of those, accepted by the check and rejected by the oracle","{""check"": ""pbh"", ""models"": 250, ""seed"": 32}",0.0
+AC3.RS131,AC3.RN8,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pkg"", ""models"": 250, ""seed"": 32}",0.0
+AC3.RS132,AC3.RN8,"of those, accepted by the check and rejected by the oracle","{""check"": ""pkg"", ""models"": 250, ""seed"": 32}",0.0
+AC3.RS133,AC3.RN8,"models whose reduced theta still has a cyclotomic factor, i.e. a root exactly on the unit circle (inadmissible)","{""models"": 250, ""seed"": 32}",0.0
+AC3.RS134,AC3.RN8,"of those, accepted by the check","{""check"": ""author"", ""models"": 250, ""seed"": 32}",0.0
+AC3.RS135,AC3.RN8,"of those, accepted by the check","{""check"": ""pbh"", ""models"": 250, ""seed"": 32}",0.0
+AC3.RS136,AC3.RN8,"of those, accepted by the check","{""check"": ""pkg"", ""models"": 250, ""seed"": 32}",0.0
+AC3.RS137,AC3.RN8,models admissible by the exact oracle,"{""models"": 250, ""seed"": 32}",61.0
+AC3.RS138,AC3.RN8,"models with an MA factor on the unit circle (1+-B, Phi_3, Phi_4, Phi_6 factors at lag 1 or seasonal)","{""models"": 250, ""seed"": 32}",79.0
+AC3.RS139,AC3.RN8,"of those, admissible by the exact oracle (the root cancelled)","{""models"": 250, ""seed"": 32}",6.0
+AC3.RS140,AC3.RN8,"max abs difference of the largest modulus, exact oracle against the author's cancelled polynomial, inadmissible models","{""inadmissible"": 189, ""models"": 250, ""seed"": 32}",8.526375161466149e-10
+AC3.RS141,AC3.RN8,"max abs difference of the largest modulus, exact oracle against the package smooth_eigens, inadmissible models","{""inadmissible"": 189, ""models"": 250, ""seed"": 32}",9.407007159900616e-07
+AC3.RS142,AC3.RN8,largest number of components in a model,"{""models"": 250, ""seed"": 32}",12.0
+AC3.RS143,AC3.RN8,seconds,"{""models"": 250, ""seed"": 32}",26.585955142974854
+AC3.RS144,AC3.RN9,"models whose root modulus after exact gcd cancellation is within 1e-5 of the unit circle, not on a cyclotomic factor (excluded)","{""models"": 250, ""seed"": 33}",0.0
+AC3.RS145,AC3.RN9,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""author"", ""models"": 250, ""seed"": 33}",0.0
+AC3.RS146,AC3.RN9,"of those, accepted by the check and rejected by the oracle","{""check"": ""author"", ""models"": 250, ""seed"": 33}",0.0
+AC3.RS147,AC3.RN9,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pbh"", ""models"": 250, ""seed"": 33}",1.0
+AC3.RS148,AC3.RN9,"of those, accepted by the check and rejected by the oracle","{""check"": ""pbh"", ""models"": 250, ""seed"": 33}",1.0
+AC3.RS149,AC3.RN9,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pkg"", ""models"": 250, ""seed"": 33}",1.0
+AC3.RS150,AC3.RN9,"of those, accepted by the check and rejected by the oracle","{""check"": ""pkg"", ""models"": 250, ""seed"": 33}",1.0
+AC3.RS151,AC3.RN9,"models whose reduced theta still has a cyclotomic factor, i.e. a root exactly on the unit circle (inadmissible)","{""models"": 250, ""seed"": 33}",2.0
+AC3.RS152,AC3.RN9,"of those, accepted by the check","{""check"": ""author"", ""models"": 250, ""seed"": 33}",0.0
+AC3.RS153,AC3.RN9,"of those, accepted by the check","{""check"": ""pbh"", ""models"": 250, ""seed"": 33}",1.0
+AC3.RS154,AC3.RN9,"of those, accepted by the check","{""check"": ""pkg"", ""models"": 250, ""seed"": 33}",1.0
+AC3.RS155,AC3.RN9,models admissible by the exact oracle,"{""models"": 250, ""seed"": 33}",58.0
+AC3.RS156,AC3.RN9,"models with an MA factor on the unit circle (1+-B, Phi_3, Phi_4, Phi_6 factors at lag 1 or seasonal)","{""models"": 250, ""seed"": 33}",81.0
+AC3.RS157,AC3.RN9,"of those, admissible by the exact oracle (the root cancelled)","{""models"": 250, ""seed"": 33}",7.0
+AC3.RS158,AC3.RN9,"max abs difference of the largest modulus, exact oracle against the author's cancelled polynomial, inadmissible models","{""inadmissible"": 192, ""models"": 250, ""seed"": 33}",3.779462298680869e-09
+AC3.RS159,AC3.RN9,"max abs difference of the largest modulus, exact oracle against the package smooth_eigens, inadmissible models","{""inadmissible"": 192, ""models"": 250, ""seed"": 33}",9.536743166282946e-07
+AC3.RS160,AC3.RN9,largest number of components in a model,"{""models"": 250, ""seed"": 33}",12.0
+AC3.RS161,AC3.RN9,seconds,"{""models"": 250, ""seed"": 33}",39.13635230064392
+AC3.RS162,AC3.RN10,"models whose root modulus after exact gcd cancellation is within 1e-5 of the unit circle, not on a cyclotomic factor (excluded)","{""models"": 250, ""seed"": 34}",1.0
+AC3.RS163,AC3.RN10,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""author"", ""models"": 250, ""seed"": 34}",0.0
+AC3.RS164,AC3.RN10,"of those, accepted by the check and rejected by the oracle","{""check"": ""author"", ""models"": 250, ""seed"": 34}",0.0
+AC3.RS165,AC3.RN10,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pbh"", ""models"": 250, ""seed"": 34}",0.0
+AC3.RS166,AC3.RN10,"of those, accepted by the check and rejected by the oracle","{""check"": ""pbh"", ""models"": 250, ""seed"": 34}",0.0
+AC3.RS167,AC3.RN10,models whose admissibility decision differs from the exact gcd oracle,"{""check"": ""pkg"", ""models"": 250, ""seed"": 34}",1.0
+AC3.RS168,AC3.RN10,"of those, accepted by the check and rejected by the oracle","{""check"": ""pkg"", ""models"": 250, ""seed"": 34}",1.0
+AC3.RS169,AC3.RN10,"models whose reduced theta still has a cyclotomic factor, i.e. a root exactly on the unit circle (inadmissible)","{""models"": 250, ""seed"": 34}",2.0
+AC3.RS170,AC3.RN10,"of those, accepted by the check","{""check"": ""author"", ""models"": 250, ""seed"": 34}",0.0
+AC3.RS171,AC3.RN10,"of those, accepted by the check","{""check"": ""pbh"", ""models"": 250, ""seed"": 34}",0.0
+AC3.RS172,AC3.RN10,"of those, accepted by the check","{""check"": ""pkg"", ""models"": 250, ""seed"": 34}",1.0
+AC3.RS173,AC3.RN10,models admissible by the exact oracle,"{""models"": 250, ""seed"": 34}",47.0
+AC3.RS174,AC3.RN10,"models with an MA factor on the unit circle (1+-B, Phi_3, Phi_4, Phi_6 factors at lag 1 or seasonal)","{""models"": 250, ""seed"": 34}",83.0
+AC3.RS175,AC3.RN10,"of those, admissible by the exact oracle (the root cancelled)","{""models"": 250, ""seed"": 34}",5.0
+AC3.RS176,AC3.RN10,"max abs difference of the largest modulus, exact oracle against the author's cancelled polynomial, inadmissible models","{""inadmissible"": 202, ""models"": 250, ""seed"": 34}",1.4945856996462226e-08
+AC3.RS177,AC3.RN10,"max abs difference of the largest modulus, exact oracle against the package smooth_eigens, inadmissible models","{""inadmissible"": 202, ""models"": 250, ""seed"": 34}",9.536743168503392e-07
+AC3.RS178,AC3.RN10,largest number of components in a model,"{""models"": 250, ""seed"": 34}",12.0
+AC3.RS179,AC3.RN10,seconds,"{""models"": 250, ""seed"": 34}",70.18880081176758
+AC3.RS180,AC3.RN11,"coefficient of B^0 in theta (MA polynomial) of the whole ETS(A,N,N)+MA(1)","{""alpha"": 1.9, ""theta"": 0.1}",1.0
+AC3.RS181,AC3.RN11,"coefficient of B^1 in theta (MA polynomial) of the whole ETS(A,N,N)+MA(1)","{""alpha"": 1.9, ""theta"": 0.1}",1.0
+AC3.RS182,AC3.RN11,"coefficient of B^2 in theta (MA polynomial) of the whole ETS(A,N,N)+MA(1)","{""alpha"": 1.9, ""theta"": 0.1}",-0.1
+AC3.RS183,AC3.RN11,coefficient of B^0 in the product of the parts' MA polynomials,"{""alpha"": 1.9, ""theta"": 0.1}",1.0
+AC3.RS184,AC3.RN11,coefficient of B^1 in the product of the parts' MA polynomials,"{""alpha"": 1.9, ""theta"": 0.1}",1.0
+AC3.RS185,AC3.RN11,coefficient of B^2 in the product of the parts' MA polynomials,"{""alpha"": 1.9, ""theta"": 0.1}",0.09
+AC3.RS186,AC3.RN11,coefficient of B^1 in phi of the whole model,"{""alpha"": 1.9, ""theta"": 0.1}",-1.0
+AC3.RS187,AC3.RN11,smallest root modulus of theta of the whole model,"{""alpha"": 1.9, ""theta"": 0.1}",0.9160797830996159
+AC3.RS188,AC3.RN11,smallest root modulus of the product of the parts' MA polynomials,"{""alpha"": 1.9, ""theta"": 0.1}",1.1111111111111112
+AC3.RS189,AC3.RN11,package smooth_eigens modulus of the whole model,"{""alpha"": 1.9, ""theta"": 0.1}",1.0916080474853516
+AC3.RS190,AC3.RN11,package smooth_eigens modulus of the ETS part alone,"{""alpha"": 1.9}",0.8999999999999999
+AC3.RS191,AC3.RN11,"max |eigenvalue| of D of the whole model (lag 1, so the expanded D)","{""alpha"": 1.9, ""theta"": 0.1}",1.0916079783099617
+AC3.RS192,AC3.RN11,max abs difference between det(I - F L) of the adam() matrices and ari polynomial times (1 - B) per constant/regressor,"{""models"": 238}",7.549516567451064e-15
+AC3.RS193,AC3.RN11,max abs difference between det(I - D L) of the adam() matrices and MA polynomial times (1 - B) per constant/regressor,"{""models"": 238}",1.4432899320127035e-14
+AC3.RS194,AC3.RN11,"pure ARIMA models (plain, constant, static regressor) from adam() with all MA roots outside the unit circle","{""models"": 238}",136.0
+AC3.RS195,AC3.RN11,"of those, models the whole-model check smooth_eigens rejects (shortcut would be wrong)","{""models"": 136}",0.0
+AC3.RS196,AC3.RN11,models from adam() with an MA root on or inside the unit circle (shortcut runs the whole check),"{""models"": 238}",102.0
+AC3.RS197,AC3.RN11,"of those, models the whole-model check accepts (root cancels)","{""models"": 102}",20.0
+AC3.RS198,AC3.RN11,models of the kind,"{""invertible"": 46, ""kind"": ""plain""}",80.0
+AC3.RS199,AC3.RN11,models of the kind,"{""invertible"": 46, ""kind"": ""constant""}",80.0
+AC3.RS200,AC3.RN11,models of the kind,"{""invertible"": 44, ""kind"": ""xreg""}",78.0
+AC3.RS201,AC3.RN12,"models with all MA roots outside the unit circle, real R adam_bounds_checker with etsModel FALSE","{""models"": 238}",136
+AC3.RS202,AC3.RN12,"of those, models with a penalty from the shortcut path or from a forced whole-model smoothEigens()","{""models"": 136}",0
+AC3.RS203,AC3.RN12,models with an MA root on or inside the circle; their penalty differs from the forced whole-model check,"{""models"": 102}",0
+AC3.RS204,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: MA(1) theta=1","{""admissible"": false}",1.0000009536743164
+AC3.RS205,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: MA(1) theta=-1","{""admissible"": false}",1.0000009536743164
+AC3.RS206,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: MA(2) 1 - B + B^2","{""admissible"": false}",1.0000009536743164
+AC3.RS207,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: MA(2) 1 + B^2","{""admissible"": false}",1.0000009536743164
+AC3.RS208,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: MA(2) 1 + B + B^2","{""admissible"": false}",1.0000009536743164
+AC3.RS209,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: AR(1) 0.5, MA(2) 1 - B + B^2","{""admissible"": false}",1.0000009536743164
+AC3.RS210,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: I(1), MA(2) 1 - B + B^2","{""admissible"": false}",1.0000009536743164
+AC3.RS211,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: I(1), MA(2) 0.6 factor times 1 - B + B^2, with 5 lags","{""admissible"": true}",0.6000000000000001
+AC3.RS212,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: ETS(A,N,N)+I(1), MA(2) 1 - B + B^2","{""admissible"": false}",1.0000009536743164
+AC3.RS213,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: I(2) with MA(2) 1 + 2B + B^2 (double unit root, cancels twice)","{""admissible"": false}",1.0000019073486328
+AC3.RS214,AC3.RN13,"package smooth_eigens modulus, theta* with an uncancelled root exactly on the unit circle: I(1) with MA(2) 1 + 2B + B^2 (double root at -1, one factor of Phi_2 left, no cancel with lag 1)","{""admissible"": false}",1.0000019073486328

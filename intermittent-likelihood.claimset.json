@@ -36,6 +36,13 @@
       "C26",
       "C31"
     ],
+    "highlights": [
+      "C10",
+      "C11",
+      "C17",
+      "C15",
+      "C22"
+    ],
     "autonomy": "human_supervised",
     "contribution_record": "complete",
     "origin": "native"

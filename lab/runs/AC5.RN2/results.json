@@ -1,0 +1,282 @@
+[
+ {
+  "variable": "models given to the oracle",
+  "value": 57.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "models on which the oracle failed",
+  "value": 0.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "models excluded by undecided",
+  "value": 0.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "models excluded by edge",
+  "value": 0.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "models compared",
+  "value": 57.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "max degree of theta, exact",
+  "value": 536.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "max degree of the cancelled MA polynomial, exact",
+  "value": 366.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "max precision of the root enclosures, bits",
+  "value": 128.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "roots proved on the unit circle",
+  "value": 0.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "admissibility decisions of the prototype's cancellation that differ from the exact oracle",
+  "value": 0.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible",
+  "value": 1.2434497875801753e-14,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "models both find inadmissible, prototype's cancellation and exact oracle",
+  "value": 10.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "models whose cancelled MA degree differs from the prototype's",
+  "value": 0.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "step-down decisions of the prototype that differ from the exact oracle",
+  "value": 0.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "max abs difference of the largest mode modulus, prototype's bisection against the exact oracle",
+  "value": 5.545208736634777e-11,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "models with a bisection value",
+  "value": 10.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1",
+  "value": 0.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "models whose shared non-cyclotomic factor could not be located",
+  "value": 0.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "models with a shared non-cyclotomic factor, all roots in |B| > 1",
+  "value": 2.0,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "time of the oracle on the set, s",
+  "value": 1.066136121749878,
+  "conditions": {
+   "set": "stepdown"
+  }
+ },
+ {
+  "variable": "models given to the oracle",
+  "value": 57.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "models on which the oracle failed",
+  "value": 0.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "models excluded by undecided",
+  "value": 0.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "models excluded by edge",
+  "value": 0.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "models compared",
+  "value": 57.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "max degree of theta, exact",
+  "value": 536.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "max degree of the cancelled MA polynomial, exact",
+  "value": 366.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "max precision of the root enclosures, bits",
+  "value": 128.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "roots proved on the unit circle",
+  "value": 0.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "admissibility decisions of the prototype's cancellation that differ from the exact oracle",
+  "value": 0.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible",
+  "value": 1.2434497875801753e-14,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "models both find inadmissible, prototype's cancellation and exact oracle",
+  "value": 10.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "models whose cancelled MA degree differs from the prototype's",
+  "value": 0.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "step-down decisions of the prototype that differ from the exact oracle",
+  "value": 0.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "max abs difference of the largest mode modulus, prototype's bisection against the exact oracle",
+  "value": 5.545208736634777e-11,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "models with a bisection value",
+  "value": 10.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1",
+  "value": 0.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "models whose shared non-cyclotomic factor could not be located",
+  "value": 0.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "models with a shared non-cyclotomic factor, all roots in |B| > 1",
+  "value": 2.0,
+  "conditions": {
+   "set": "all"
+  }
+ },
+ {
+  "variable": "time of the oracle, s",
+  "value": 1.0711045265197754,
+  "conditions": {
+   "set": "all"
+  }
+ }
+]

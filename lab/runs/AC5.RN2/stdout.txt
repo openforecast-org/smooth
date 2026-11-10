@@ -1,0 +1,40 @@
+python-flint 0.9.0; enclosures (128, 512, 2048) bits; edge 1e-08
+models given to the oracle {'set': 'stepdown'} 57.0
+models on which the oracle failed {'set': 'stepdown'} 0.0
+models excluded by undecided {'set': 'stepdown'} 0.0
+models excluded by edge {'set': 'stepdown'} 0.0
+models compared {'set': 'stepdown'} 57.0
+max degree of theta, exact {'set': 'stepdown'} 536.0
+max degree of the cancelled MA polynomial, exact {'set': 'stepdown'} 366.0
+max precision of the root enclosures, bits {'set': 'stepdown'} 128.0
+roots proved on the unit circle {'set': 'stepdown'} 0.0
+admissibility decisions of the prototype's cancellation that differ from the exact oracle {'set': 'stepdown'} 0.0
+max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible {'set': 'stepdown'} 1.2434497875801753e-14
+models both find inadmissible, prototype's cancellation and exact oracle {'set': 'stepdown'} 10.0
+models whose cancelled MA degree differs from the prototype's {'set': 'stepdown'} 0.0
+step-down decisions of the prototype that differ from the exact oracle {'set': 'stepdown'} 0.0
+max abs difference of the largest mode modulus, prototype's bisection against the exact oracle {'set': 'stepdown'} 5.545208736634777e-11
+models with a bisection value {'set': 'stepdown'} 10.0
+models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1 {'set': 'stepdown'} 0.0
+models whose shared non-cyclotomic factor could not be located {'set': 'stepdown'} 0.0
+models with a shared non-cyclotomic factor, all roots in |B| > 1 {'set': 'stepdown'} 2.0
+time of the oracle on the set, s {'set': 'stepdown'} 1.066136121749878
+models given to the oracle {'set': 'all'} 57.0
+models on which the oracle failed {'set': 'all'} 0.0
+models excluded by undecided {'set': 'all'} 0.0
+models excluded by edge {'set': 'all'} 0.0
+models compared {'set': 'all'} 57.0
+max degree of theta, exact {'set': 'all'} 536.0
+max degree of the cancelled MA polynomial, exact {'set': 'all'} 366.0
+max precision of the root enclosures, bits {'set': 'all'} 128.0
+roots proved on the unit circle {'set': 'all'} 0.0
+admissibility decisions of the prototype's cancellation that differ from the exact oracle {'set': 'all'} 0.0
+max abs difference of the largest mode modulus, prototype's roots after cancellation against the exact oracle, models both find inadmissible {'set': 'all'} 1.2434497875801753e-14
+models both find inadmissible, prototype's cancellation and exact oracle {'set': 'all'} 10.0
+models whose cancelled MA degree differs from the prototype's {'set': 'all'} 0.0
+step-down decisions of the prototype that differ from the exact oracle {'set': 'all'} 0.0
+max abs difference of the largest mode modulus, prototype's bisection against the exact oracle {'set': 'all'} 5.545208736634777e-11
+models with a bisection value {'set': 'all'} 10.0
+models with a shared factor of theta and phi that is not a product of Phi_n, n dividing a lag, with a root in |B| <= 1 {'set': 'all'} 0.0
+models whose shared non-cyclotomic factor could not be located {'set': 'all'} 0.0
+models with a shared non-cyclotomic factor, all roots in |B| > 1 {'set': 'all'} 2.0

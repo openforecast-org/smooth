@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.40",
+  "schema_version": "0.41",
   "paper": {
     "title": "The observed-data likelihood of ADAM and iETS with unobserved periods",
     "licence": "CC-BY-4.0",
@@ -241,7 +241,7 @@
     {
       "id": "D3",
       "term": "observed-data likelihood",
-      "definition": "The joint density of the observed data only, obtained by integrating the complete-data likelihood over the values at the unobserved periods.",
+      "definition": "The joint density of the observed data only, obtained by integrating the complete-data likelihood over the values $\\mathbf z_{\\mathrm{mis}}$ at the unobserved periods: $$L(\\theta)=\\int f(\\mathbf y_{\\mathrm{obs}},\\mathbf z_{\\mathrm{mis}};\\theta)\\,d\\mathbf z_{\\mathrm{mis}}.$$",
       "kind": "concept"
     },
     {
@@ -3127,7 +3127,7 @@
     {
       "id": "A2",
       "kind": "software",
-      "uri": "https://github.com/openforecast-org/smooth",
+      "uri": "https://github.com/openforecast-org/smooth/tree/8a5fbbb334b0d6192a3c3e8a5773f512e548e891",
       "version": "8a5fbbb334b0d6192a3c3e8a5773f512e548e891",
       "licence": "LGPL-2.1-only",
       "availability": {

@@ -1,0 +1,17 @@
+[
+ {
+  "quantity": "admissibility decisions that differ from the PBH reference",
+  "value": 0.0,
+  "conditions": {}
+ },
+ {
+  "quantity": "models within 1e-8 of the unit circle, excluded",
+  "value": 0.0,
+  "conditions": {}
+ },
+ {
+  "quantity": "models exported",
+  "value": 2.0,
+  "conditions": {}
+ }
+]

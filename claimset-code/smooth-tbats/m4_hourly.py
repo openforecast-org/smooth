@@ -17,15 +17,16 @@ A method that fails on a series (an error, or non-finite forecasts) gets the for
 of seasonal naive 168 for that series, and no interval (its test values count as
 uncovered); the failures are counted.
 
-Measures: MASE (scaled by the in-sample mean absolute seasonal difference at lag 24, as
-in M4), the coverage of the 95% intervals, the elapsed seconds per series.
+Measures: RMSSE (the root mean squared error scaled by the in-sample root mean squared
+first difference, as in M5), the coverage of the 95% intervals, the elapsed seconds
+per series.
 Statistics of smooth TBATS against each comparator: the geometric mean over series of
-the ratio of MASEs (relative MASE) with its 99% t-interval on the log scale, and
+the ratio of RMSSEs (relative RMSSE) with its 99% t-interval on the log scale, and
 one-sided t-tests on the mean log ratio at the 1% level: non-inferiority with the margin
-1.05 against forecast::tbats and AutoTBATS (H0: relative MASE >= 1.05), superiority
-against seasonal naive 168 (H0: relative MASE >= 1), and the elapsed time against
+1.05 against forecast::tbats and AutoTBATS (H0: relative RMSSE >= 1.05), superiority
+against seasonal naive 168 (H0: relative RMSSE >= 1), and the elapsed time against
 forecast::tbats (H0: ratio of times >= 1); the four p-values are adjusted by Holm.
-The Nemenyi test (greybox's rmcb, level 0.99) on the MASE of the five methods: their
+The Nemenyi test (greybox's rmcb, level 0.99) on the RMSSE of the five methods: their
 mean ranks over series with intervals, and its critical distance (the width of the
 intervals: two methods differ when their mean ranks differ by more than it).
 
@@ -159,11 +160,11 @@ def run_r(samples, run_dir, workers):
 def measures(row, y, actual):
     failed = row["status"] != "ok"
     mean = snaive(y) if failed else row["mean"]
-    scale = np.mean(np.abs(y[24:] - y[:-24]))
+    scale = np.sqrt(np.mean(np.diff(y) ** 2))
     result = {
         "series": row["series"], "method": row["method"], "failed": failed,
         "status": row["status"], "seconds": row["seconds"],
-        "MASE": float(np.mean(np.abs(actual - mean)) / scale),
+        "RMSSE": float(np.sqrt(np.mean((actual - mean) ** 2)) / scale),
         "coverage": 0.0 if failed else np.nan,
     }
     if not failed and row["lower"] is not None:
@@ -192,12 +193,12 @@ def holm(p_values):
 
 
 def nemenyi(wide, base):
-    """The Nemenyi test (rmcb) on the MASE of all methods: mean ranks with intervals,
+    """The Nemenyi test (rmcb) on the RMSSE of all methods: mean ranks with intervals,
     the critical distance and the p-value of rmcb's test of equal ranks."""
     test = rmcb(wide, level=1 - ALPHA, outplot="none")
     interval = test.interval
     results = [
-        {"variable": "mean rank of MASE, Nemenyi test", "value": float(test.mean[m]),
+        {"variable": "mean rank of RMSSE, Nemenyi test", "value": float(test.mean[m]),
          "interval": {"level": 1 - ALPHA, "lower": float(interval.loc[m].iloc[0]),
                       "upper": float(interval.loc[m].iloc[1])},
          "conditions": {**base, "method": m}}
@@ -205,25 +206,25 @@ def nemenyi(wide, base):
     ]
     width = interval.iloc[:, 1] - interval.iloc[:, 0]
     results += [
-        {"variable": "critical distance, Nemenyi test (MASE)",
+        {"variable": "critical distance, Nemenyi test (RMSSE)",
          "value": float(width.iloc[0]), "conditions": {**base, "level": 1 - ALPHA}},
         {"variable": "series in Nemenyi test", "value": len(wide), "conditions": base},
-        {"variable": "p-value, rmcb test of equal mean ranks (MASE)",
+        {"variable": "p-value, rmcb test of equal mean ranks (RMSSE)",
          "value": float(test.p_value), "conditions": base},
     ]
     return results
 
 
 def statistics(table, split):
-    wide = table.pivot(index="series", columns="method", values="MASE")
+    wide = table.pivot(index="series", columns="method", values="RMSSE")
     times = table.pivot(index="series", columns="method", values="seconds")
     results, tests = [], {}
     base = {"split": split}
     for method, group in table.groupby("method"):
         results += [
-            {"variable": "MASE", "value": float(group["MASE"].mean()),
+            {"variable": "RMSSE", "value": float(group["RMSSE"].mean()),
              "conditions": {**base, "method": method, "statistic": "mean"}},
-            {"variable": "MASE", "value": float(group["MASE"].median()),
+            {"variable": "RMSSE", "value": float(group["RMSSE"].median()),
              "conditions": {**base, "method": method, "statistic": "median"}},
             {"variable": "elapsed time", "value": float(group["seconds"].median()),
              "unit": "s", "conditions": {**base, "method": method,
@@ -244,12 +245,12 @@ def statistics(table, split):
         mean, lower, upper, p, n = one_sided(ratios, null)
         conditions = {**base, "method": "smooth TBATS", "comparator": comparator}
         results += [
-            {"variable": "relative MASE", "value": float(np.exp(mean)),
+            {"variable": "relative RMSSE", "value": float(np.exp(mean)),
              "interval": {"level": 1 - ALPHA, "lower": float(np.exp(lower)),
                           "upper": float(np.exp(upper))}, "conditions": conditions},
-            {"variable": "series in relative MASE", "value": n,
+            {"variable": "series in relative RMSSE", "value": n,
              "conditions": conditions},
-            {"variable": "series excluded by zero MASE", "value": excluded,
+            {"variable": "series excluded by zero RMSSE", "value": excluded,
              "conditions": conditions},
         ]
         if comparator != "ADAM ETS":
@@ -265,10 +266,10 @@ def statistics(table, split):
     names = list(tests)
     for name, p, adjusted in zip(names, [tests[k] for k in names],
                                  holm(np.array([tests[k] for k in names]))):
-        test = "time" if name == "elapsed time" else "MASE"
+        test = "time" if name == "elapsed time" else "RMSSE"
         for kind, value in (("p-value", p), ("Holm-adjusted p-value", adjusted)):
             results.append({"variable": f"{kind}, one-sided t-test, smooth TBATS vs "
-                                        f"{name if test == 'MASE' else 'forecast::tbats'}"
+                                        f"{name if test == 'RMSSE' else 'forecast::tbats'}"
                                         f" ({test})", "value": float(value),
                             "conditions": base})
     return results

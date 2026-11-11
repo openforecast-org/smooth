@@ -419,6 +419,12 @@
       "term": "divergence by numerical integration",
       "kind": "design",
       "definition": "The Kullback-Leibler divergence in both directions between the exact convolution and each approximation, by composite 8-node Gauss-Legendre integration (kl_laplace.py)."
+    },
+    {
+      "id": "D32",
+      "term": "differential entropy",
+      "kind": "concept",
+      "definition": "For a size with density $f_z$, $$H_z = -\\E\\log f_z = -\\int f_z(z)\\log f_z(z)\\,dz.$$"
     }
   ],
   "claims": [
@@ -999,7 +1005,7 @@
     },
     {
       "id": "C14",
-      "statement": "With the differential entropy defined as $H=-\\E\\log f$, the sign of the entropy term in equations 29 and B.6 of Svetunkov and Boylan (2023) should be negative.",
+      "statement": "With the [[D32:differential entropy]] defined as $H=-\\E\\log f$, the sign of the entropy term in equations 29 and B.6 of Svetunkov and Boylan (2023) should be negative.",
       "about": {
         "subject": "the entropy term in eqs 29 and B.6 of Svetunkov and Boylan (2023)",
         "relation": "should have the sign",
@@ -1014,8 +1020,8 @@
       "novelty": "refutation",
       "support": [
         {
-          "kind": "argument",
-          "warrant": "W2"
+          "kind": "formal_proof",
+          "evidence": "E15"
         },
         {
           "kind": "cited",
@@ -1024,7 +1030,6 @@
           "self": true
         }
       ],
-      "warrant": "W2",
       "provenance": "author_stated",
       "verification": "unchecked",
       "relations": [
@@ -2451,6 +2456,53 @@
       }
     },
     {
+      "id": "E15",
+      "profile": "formal",
+      "description": "Derivation of the sign of the term iETS adds for each period with zero demand (source draft, artefact A1, the remark after the corollary on the shrunk scale).",
+      "foundation": "Lebesgue integration",
+      "steps": [
+        {
+          "id": "E15.1",
+          "statement": "$$H_z = -\\E\\log f_z = -\\int f_z(z)\\log f_z(z)\\,dz$$",
+          "by": [
+            "D32"
+          ],
+          "rule": "definition of the differential entropy"
+        },
+        {
+          "id": "E15.2",
+          "statement": "$$\\int f_z(z)\\log f_z(z)\\,dz = -H_z$$",
+          "by": [
+            "E15.1"
+          ],
+          "rule": "multiplying by $-1$"
+        },
+        {
+          "id": "E15.3",
+          "statement": "The term added for each period with zero demand is the expected log-density of the unobserved size under its own distribution, $\\int f_z\\log f_z\\,dz$ (the E-step analogy that motivates eq. B.6 of Svetunkov and Boylan, 2023)",
+          "by": [
+            "D4"
+          ],
+          "rule": "definition of the objective"
+        },
+        {
+          "id": "E15.4",
+          "statement": "$$\\int f_z\\log f_z\\,dz = -H_z,$$ so the entropy enters the objective with a negative sign",
+          "by": [
+            "E15.2",
+            "E15.3"
+          ],
+          "rule": "substitution"
+        }
+      ],
+      "artefacts": [
+        "A1"
+      ],
+      "availability": {
+        "level": "public"
+      }
+    },
+    {
       "id": "E20",
       "profile": "simulation",
       "description": "Comparison, for iETS(M,N,N) under the ADAM and conventional multiplicative ETS forms, of the normal-drift mixture density (drift moments by 32-node Gauss-Legendre, mixture by 16-node Gauss-Hermite) and of the one-step density against the exact density of the size after an interval, computed on a grid of step 0.001 in log z by FFT convolution with tails cut at 1e-12, by the largest Kullback-Leibler divergence per observation over $s$ from 0.05 to 1 in steps of 0.05, $\\alpha$ from 0.1 to 0.6 in steps of 0.05 and $j$ from 2 to 20; a 164-cell refinement run halved the step and cut tails at 1e-14. The run recorded smooth commit f9d062ee with the claimset scripts not yet committed; the scripts are archived at commit f1de3ea1.",
@@ -3073,12 +3125,6 @@
         "C2"
       ],
       "text": "With a dynamic scale model, the scale at each period with zero demand is a free function of the parameters and enters the entropy-augmented likelihood only through the term $-H_z$; for the normal distribution $-H_z=-\\frac12\\log(2\\pi e\\sigma^2)$ increases without bound as $\\sigma\\to0$, and for the Gamma distribution the entropy decreases in the scale for large values, so the objective has no finite maximum."
-    },
-    {
-      "id": "W2",
-      "reasoning": "deductive",
-      "premises": [],
-      "text": "The expected log-density of an unobserved size is $\\int f_z\\log f_z\\,dz$, which equals $-H_z$ when the differential entropy is $H_z=-\\E\\log f_z$; the term added for each zero therefore enters the objective with a negative sign."
     },
     {
       "id": "W3",

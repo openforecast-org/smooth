@@ -1,0 +1,4 @@
+max relative difference of fitted values over all cases, smooth TBATS vs De Livera recursion {'seeds': '[101, 102, 103, 104, 105, 106, 107, 108, 109, 110]', 'cases': 360} 5.1122857914327425e-14
+max absolute in-sample error over all noise-free series, backcasting {'seeds': '[101, 102, 103, 104, 105, 106, 107, 108, 109, 110]', 'n': 300} 1.7696635268293903e-09
+max absolute difference of smooth's impulse response from alpha + phi^j over all cases  2.220446049250313e-16
+min over cases of the max absolute difference of smooth's impulse response from the ARMA-errors response  0.01651176558114527

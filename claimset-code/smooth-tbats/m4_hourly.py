@@ -14,7 +14,8 @@ Methods, all single-threaded (OMP_NUM_THREADS=1), with 95% prediction intervals:
 - ADAM ETS: ADAM(model="ZXZ", lags=[1, 24, 168]) with its default settings;
 - seasonal naive 168: the last week repeated (no intervals).
 A method that fails on a series (an error, or non-finite forecasts) gets the forecasts
-of seasonal naive 168 for that series, and no interval; the failures are counted.
+of seasonal naive 168 for that series, and no interval (its test values count as
+uncovered); the failures are counted.
 
 Measures: MASE (scaled by the in-sample mean absolute seasonal difference at lag 24, as
 in M4), sMAPE, the coverage of the 95% intervals, the elapsed seconds per series.
@@ -160,7 +161,7 @@ def measures(row, y, actual):
         "MASE": float(np.mean(np.abs(actual - mean)) / scale),
         "sMAPE": float(np.mean(200 * np.abs(actual - mean)
                                / (np.abs(actual) + np.abs(mean)))),
-        "coverage": np.nan,
+        "coverage": 0.0 if failed else np.nan,
     }
     if not failed and row["lower"] is not None:
         inside = (actual >= row["lower"]) & (actual <= row["upper"])

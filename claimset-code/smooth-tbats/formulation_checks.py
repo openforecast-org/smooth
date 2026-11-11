@@ -3,7 +3,7 @@
 H1: with the same parameters and initial states, smooth's TBATS (no ARMA) gives the
     one-step fitted values of an independent implementation of De Livera et al.'s
     rotation-form recursion, in the Box-Cox space.
-H2: backcasting through the harmonic block is exact on a noise-free series.
+H2: backcasting through the harmonic block is exact on noise-free series.
 H3: the impulse response of ADAM's ARMA in smooth's matrices is alpha + phi^j, and
     differs from the ARMA errors of De Livera et al.
 
@@ -176,38 +176,66 @@ def check_h1(seeds, n):
     return results
 
 
-def check_h2(n):
+def check_h2(seeds, n):
+    """Per seed: a noise-free series of a random level and random harmonics of the
+    periods 7.3 and 24, fitted with random fixed persistence and backcasting."""
+    results, worst = [], 0.0
     t = np.arange(1, n + 1)
-    z = 50.0 + 2.0 * np.sin(2 * np.pi * t / 7.3) + 1.0 * np.cos(4 * np.pi * t / 7.3)
-    z += 3.0 * np.sin(2 * np.pi * t / 24) - 1.5 * np.cos(2 * np.pi * t / 24)
-    z += 0.5 * np.sin(6 * np.pi * t / 24)
-    model = TBATS(
-        lags=[1.0, 7.3, 24.0],
-        harmonics=[2, 3],
-        trend="none",
-        lambda_bc=1.0,
-        orders={"ar": 0, "ma": 0, "select": False},
-        persistence={"level": 0.1, "seasonal": [[0.01, 0.005], [0.02, -0.01]]},
-        initial="backcasting",
-        distribution="dnorm",
-        bounds="none",
-    )
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        model.fit(z)
-    error = float(np.nanmax(np.abs(np.asarray(model.residuals, float))))
-    return [{
-        "variable": "max absolute in-sample error, noise-free harmonic series, "
+    for seed in seeds:
+        rng = np.random.default_rng(seed)
+        harmonics = [int(rng.integers(1, 4)), int(rng.integers(1, 5))]
+        z = np.full(n, rng.uniform(20, 200))
+        for m, k in zip([7.3, 24.0], harmonics):
+            for j in range(1, k + 1):
+                a, b = rng.normal(0, 2, 2)
+                z += a * np.sin(2 * np.pi * j * t / m) + b * np.cos(2 * np.pi * j * t / m)
+        persistence = {"level": rng.uniform(0.01, 0.3),
+                       "seasonal": [list(rng.uniform(-0.02, 0.02, 2)) for _ in range(2)]}
+        model = TBATS(
+            lags=[1.0, 7.3, 24.0],
+            harmonics=harmonics,
+            trend="none",
+            lambda_bc=1.0,
+            orders={"ar": 0, "ma": 0, "select": False},
+            persistence=persistence,
+            initial="backcasting",
+            distribution="dnorm",
+            bounds="none",
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            model.fit(z)
+        error = float(np.nanmax(np.abs(np.asarray(model.residuals, float))))
+        worst = max(worst, error)
+        results.append({
+            "variable": "max absolute in-sample error, noise-free harmonic series, "
+                        "backcasting",
+            "value": error,
+            "conditions": {"seed": seed, "periods": "7.3+24",
+                           "harmonics": str(harmonics), "n": n},
+        })
+    results.append({
+        "variable": "max absolute in-sample error over all noise-free series, "
                     "backcasting",
-        "value": error,
-        "conditions": {"periods": "7.3+24", "harmonics": "[2, 3]", "n": n},
-    }]
+        "value": worst,
+        "conditions": {"seeds": str(list(seeds)), "n": n},
+    })
+    return results
 
 
-def check_h3():
+def h3_cases(seeds):
+    """Per seed: nine (alpha, phi) pairs, alpha in (0.05, 0.95), |phi| in (0.05, 0.95)."""
+    for seed in seeds:
+        rng = np.random.default_rng(seed)
+        for _ in range(9):
+            sign = rng.choice([-1.0, 1.0])
+            yield seed, rng.uniform(0.05, 0.95), sign * rng.uniform(0.05, 0.95)
+
+
+def check_h3(seeds):
     results, worst_smooth, closest_errors = [], 0.0, np.inf
     y = 100 + np.random.default_rng(0).normal(0, 1, 200)
-    for alpha, phi in itertools.product([0.1, 0.3, 0.7], [-0.5, 0.3, 0.8]):
+    for seed, alpha, phi in h3_cases(seeds):
         model = TBATS(
             lags=[1.0],
             trend="none",
@@ -239,7 +267,7 @@ def check_h3():
                 "variable": f"max absolute difference of the impulse response of smooth "
                             f"TBATS from {name}, lags 1-20",
                 "value": value,
-                "conditions": {"alpha": alpha, "phi": phi},
+                "conditions": {"seed": seed, "alpha": alpha, "phi": phi},
             })
     results += [
         {"variable": "max absolute difference of smooth's impulse response from "
@@ -255,7 +283,8 @@ def main():
     parser.add_argument("--seeds", type=int, nargs="+", default=[1])
     parser.add_argument("--n", type=int, default=300)
     args = parser.parse_args()
-    results = check_h1(args.seeds, args.n) + check_h2(args.n) + check_h3()
+    results = (check_h1(args.seeds, args.n) + check_h2(args.seeds, args.n)
+               + check_h3(args.seeds))
     for r in results:
         if "seed" not in r.get("conditions", {}):
             print(r["variable"], r.get("conditions", ""), r["value"])

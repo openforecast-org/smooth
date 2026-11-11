@@ -36,7 +36,8 @@ def box_cox_inverse(z, lam):
 def de_livera(z, periods, harmonics, trend, alpha, beta, phi, gammas, init):
     """One-step fitted values of De Livera et al.'s TBATS (rotation form, no ARMA)
     for the series z in the Box-Cox space, from the states at t=0: the level, the
-    trend and, per harmonic, s_0 (the cosine coefficient) and s*_0 (the sine one)."""
+    trend and, per harmonic and period, s*_0 (the first k values of the period's
+    array) and s_0 (the last k)."""
     freq = np.concatenate(
         [2 * np.pi * np.arange(1, k + 1) / m for m, k in zip(periods, harmonics)]
     )
@@ -57,6 +58,22 @@ def de_livera(z, periods, harmonics, trend, alpha, beta, phi, gammas, init):
         slope = damping * slope + beta * d
         s, s_star = cos * s + sin * s_star + g1 * d, -sin * s + cos * s_star + g2 * d
     return fitted
+
+
+def smooth_coefficients(periods, harmonics, seasonal):
+    """smooth's initial Fourier coefficients (sines, then cosines per period) from De
+    Livera's states at t=0. smooth's coefficients define s(t) = a sin(lambda t) +
+    b cos(lambda t) with s(1) entering y_1, while De Livera's s_0 enters y_1: so
+    s_0 = a sin(lambda) + b cos(lambda) and s*_0 = a cos(lambda) - b sin(lambda), i.e.
+    a = s_0 sin(lambda) + s*_0 cos(lambda), b = s_0 cos(lambda) - s*_0 sin(lambda)."""
+    result = []
+    for m, k, c in zip(periods, harmonics, seasonal):
+        f = 2 * np.pi * np.arange(1, k + 1) / m
+        s_star, s = c[:k], c[k:]
+        a = s * np.sin(f) + s_star * np.cos(f)
+        b = s * np.cos(f) - s_star * np.sin(f)
+        result.append(np.concatenate([a, b]))
+    return result
 
 
 def draw_case(rng, periods, trend, lam, n):
@@ -128,7 +145,8 @@ def check_h1(seeds, n):
                              "seasonal": [list(g) for g in gammas]},
                 phi=phi if trend == "damped" else None,
                 initial={"level": init["level"], "trend": init["trend"],
-                         "seasonal": [np.asarray(c) for c in init["seasonal"]]},
+                         "seasonal": smooth_coefficients(periods, harmonics,
+                                                         init["seasonal"])},
                 distribution="dnorm",
                 bounds="none",
             )

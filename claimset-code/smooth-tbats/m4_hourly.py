@@ -20,11 +20,14 @@ uncovered); the failures are counted.
 Measures: MASE (scaled by the in-sample mean absolute seasonal difference at lag 24, as
 in M4), sMAPE, the coverage of the 95% intervals, the elapsed seconds per series.
 Statistics of smooth TBATS against each comparator: the geometric mean over series of
-the ratio of MASEs (relative MASE) with its 95% t-interval on the log scale, and
-one-sided t-tests on the mean log ratio: non-inferiority with the margin 1.05 against
-forecast::tbats and AutoTBATS (H0: relative MASE >= 1.05), superiority against
-seasonal naive 168 (H0: relative MASE >= 1), and the elapsed time against
+the ratio of MASEs (relative MASE) with its 99% t-interval on the log scale, and
+one-sided t-tests on the mean log ratio at the 1% level: non-inferiority with the margin
+1.05 against forecast::tbats and AutoTBATS (H0: relative MASE >= 1.05), superiority
+against seasonal naive 168 (H0: relative MASE >= 1), and the elapsed time against
 forecast::tbats (H0: ratio of times >= 1); the four p-values are adjusted by Holm.
+The Nemenyi test (greybox's rmcb, level 0.99) on the MASE of the five methods: their
+mean ranks over series with intervals, and its critical distance (the width of the
+intervals: two methods differ when their mean ranks differ by more than it).
 
 Run: python m4_hourly.py --train TRAIN.csv --test TEST.csv --split test [--series N]
 Writes the per-series measures and the forecasts into $CLAIMSET_RUN_DIR and the
@@ -42,10 +45,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from greybox import rmcb
 from scipy import stats
 
 H = 48
 LEVEL = 0.95
+ALPHA = 0.01
 HERE = Path(__file__).resolve().parent
 PYTHON_METHODS = ["smooth TBATS", "AutoTBATS", "ADAM ETS", "seasonal naive 168"]
 COMPARATORS = ["forecast::tbats", "AutoTBATS", "ADAM ETS", "seasonal naive 168"]
@@ -170,10 +175,11 @@ def measures(row, y, actual):
 
 
 def one_sided(log_ratios, null):
-    """Mean, its 95% interval and the one-sided t-test p-value of H0: mean >= null."""
+    """Mean, its 1 - ALPHA interval and the one-sided t-test p-value of H0: mean >=
+    null."""
     n = len(log_ratios)
     mean, se = np.mean(log_ratios), np.std(log_ratios, ddof=1) / np.sqrt(n)
-    half = stats.t.ppf(0.975, n - 1) * se
+    half = stats.t.ppf(1 - ALPHA / 2, n - 1) * se
     p = stats.t.cdf((mean - null) / se, n - 1)
     return mean, mean - half, mean + half, float(p), n
 
@@ -185,6 +191,29 @@ def holm(p_values):
         running = max(running, min(1.0, (len(p_values) - rank) * p_values[i]))
         adjusted[i] = running
     return adjusted
+
+
+def nemenyi(wide, base):
+    """The Nemenyi test (rmcb) on the MASE of all methods: mean ranks with intervals,
+    the critical distance and the p-value of rmcb's test of equal ranks."""
+    test = rmcb(wide, level=1 - ALPHA, outplot="none")
+    interval = test.interval
+    results = [
+        {"variable": "mean rank of MASE, Nemenyi test", "value": float(test.mean[m]),
+         "interval": {"level": 1 - ALPHA, "lower": float(interval.loc[m].iloc[0]),
+                      "upper": float(interval.loc[m].iloc[1])},
+         "conditions": {**base, "method": m}}
+        for m in wide.columns
+    ]
+    width = interval.iloc[:, 1] - interval.iloc[:, 0]
+    results += [
+        {"variable": "critical distance, Nemenyi test (MASE)",
+         "value": float(width.iloc[0]), "conditions": {**base, "level": 1 - ALPHA}},
+        {"variable": "series in Nemenyi test", "value": len(wide), "conditions": base},
+        {"variable": "p-value, rmcb test of equal mean ranks (MASE)",
+         "value": float(test.p_value), "conditions": base},
+    ]
+    return results
 
 
 def statistics(table, split):
@@ -220,7 +249,7 @@ def statistics(table, split):
         conditions = {**base, "method": "smooth TBATS", "comparator": comparator}
         results += [
             {"variable": "relative MASE", "value": float(np.exp(mean)),
-             "interval": {"level": 0.95, "lower": float(np.exp(lower)),
+             "interval": {"level": 1 - ALPHA, "lower": float(np.exp(lower)),
                           "upper": float(np.exp(upper))}, "conditions": conditions},
             {"variable": "series in relative MASE", "value": n,
              "conditions": conditions},
@@ -232,10 +261,11 @@ def statistics(table, split):
     log_times = np.log(times["smooth TBATS"] / times["forecast::tbats"]).to_numpy()
     mean, lower, upper, tests["elapsed time"], n = one_sided(log_times, 0.0)
     results.append({"variable": "relative elapsed time", "value": float(np.exp(mean)),
-                    "interval": {"level": 0.95, "lower": float(np.exp(lower)),
+                    "interval": {"level": 1 - ALPHA, "lower": float(np.exp(lower)),
                                  "upper": float(np.exp(upper))},
                     "conditions": {**base, "method": "smooth TBATS",
                                    "comparator": "forecast::tbats"}})
+    results += nemenyi(wide, base)
     names = list(tests)
     for name, p, adjusted in zip(names, [tests[k] for k in names],
                                  holm(np.array([tests[k] for k in names]))):

@@ -47,7 +47,7 @@
     "contribution_record": "complete",
     "origin": "native",
     "id": "entrylib:2026.000003",
-    "correction_reason": "The proofs of C1, C2, C5, C6, C8, C10, C12, C14, C16 and C19 were checked by an independent agent on a second model (contributor P6; reports in artefact A10). Its first round found five proofs that showed less than their claims stated; these claims are corrected to what is proved: C2 completes its argument with the normal-variance case, C5 states its condition as a nonzero $\\mathbf w'\\mathbf F^{i-1}\\mathbf g$ and its conclusion for the objective and the variance, C10 states the conditions of the interval and that its bound is a quantile of the size distribution, C14 states the derivation of the sign (the sign printed by Svetunkov and Boylan, 2023, is in its relation), and C19 is stated for ETS(M,N,N) at horizons of two or more. The second round confirmed all ten in full. C14 rests on a formal proof (new evidence E15, definition D32) instead of an argument; D4 defines the term of each zero without presupposing its sign. Smaller precisions: C1 (positive sizes), C6 (the error mean enters the propagation through g), C8 depends on C15, C16 (alpha nonzero). Relations name references (B5-B7 added), and C1, C3, C6, C7, C9, C10 and C11 relate to the earlier work they extend or supersede. No claim ID changed."
+    "correction_reason": "The proofs of C1, C2, C5, C6, C8, C10, C12, C14, C16 and C19 were checked by an independent agent on a second model (contributor P6; reports in artefacts A10 and A11). Its first round found five proofs that showed less than their claims stated; these claims are corrected to what is proved: C2 completes its argument with the normal-variance case, C5 states its condition as a nonzero $\\mathbf w'\\mathbf F^{i-1}\\mathbf g$ and its conclusion for the objective and the variance, C10 states the conditions of the interval and that its bound is a quantile of the size distribution, C14 states the derivation of the sign (the sign printed by Svetunkov and Boylan, 2023, is in its relation), and C19 is stated for ETS(M,N,N) at horizons of two or more. The second round confirmed all ten in full. C14 rests on a formal proof (new evidence E15, definition D32) instead of an argument; D4 defines the term of each zero without presupposing its sign. Smaller precisions: C1 (positive sizes), C6 (the error mean enters the propagation through g), C8 depends on C15, C16 (alpha nonzero). Relations name references (B5-B7 added), and C1, C3, C6, C7, C9, C10 and C11 relate to the earlier work they extend or supersede. No claim ID changed."
   },
   "contributors": [
     {
@@ -573,7 +573,7 @@
           "by": "P6",
           "outcome": "confirmed",
           "extent": "full",
-          "notes": "Re-derived the prediction-error factorisation: P(y=0|past)=1-p by independence and continuity, and y>0 has density p*f, so the log-likelihood separates into size and occurrence parts. Checked numerically on ETS(A,N,N) with two unobserved periods: the integral of the complete-data density over the unobserved sizes equals the Kalman predictive-density sum to 2e-13. (first round; report A10, scripts A11.)"
+          "notes": "Re-derived the prediction-error factorisation: P(y=0|past)=1-p by independence and continuity, and y>0 has density p*f, so the log-likelihood separates into size and occurrence parts. Checked numerically on ETS(A,N,N) with two unobserved periods: the integral of the complete-data density over the unobserved sizes equals the Kalman predictive-density sum to 2e-13. (first round; report A10, scripts A14-A16.)"
         }
       ]
     },
@@ -631,7 +631,7 @@
           "by": "P6",
           "outcome": "confirmed",
           "extent": "full",
-          "notes": "Re-derived Fisher's identity (gradient of Q at the current estimate equals the observed-data score, valid at every iterate and so at EM fixed points) and the normal-variance example: the observed-data likelihood is stationary at S/T1 and the entropy-augmented one at S/T, different when T0>0 and S>0. Numerically with T1=60, T0=40 the maximisers are 3.318 and 1.991, and the cross-entropy gradient at the current estimate is 0 while that of -H is -0.385. (second round, on the claim as corrected; report A10, scripts A11.)"
+          "notes": "Re-derived Fisher's identity (gradient of Q at the current estimate equals the observed-data score, valid at every iterate and so at EM fixed points) and the normal-variance example: the observed-data likelihood is stationary at S/T1 and the entropy-augmented one at S/T, different when T0>0 and S>0. Numerically with T1=60, T0=40 the maximisers are 3.318 and 1.991, and the cross-entropy gradient at the current estimate is 0 while that of -H is -0.385. (second round, on the claim as corrected; reports A10 and A11, scripts A14-A17.)"
         }
       ]
     },
@@ -810,7 +810,7 @@
           "by": "P6",
           "outcome": "confirmed",
           "extent": "full",
-          "notes": "Re-derived f=1+sum c_i^2>1 for some c_i!=0 and that the zero-error likelihood uses sigma^2 where the exact one uses sigma^2 f_t, so the likelihoods differ; the variance maximisers (1/T1)sum e^2 and (1/T1)sum v^2/f differ because their difference is positive when the first observed period after a gap is the last observation. In an ETS(A,N,N) check the two sums were 7.4975 and 6.7015, and the difference was positive in all 2000 random samples. (second round, on the claim as corrected; report A10, scripts A11.)"
+          "notes": "Re-derived f=1+sum c_i^2>1 for some c_i!=0 and that the zero-error likelihood uses sigma^2 where the exact one uses sigma^2 f_t, so the likelihoods differ; the variance maximisers (1/T1)sum e^2 and (1/T1)sum v^2/f differ because their difference is positive when the first observed period after a gap is the last observation. In an ETS(A,N,N) check the two sums were 7.4975 and 6.7015, and the difference was positive in all 2000 random samples. (second round, on the claim as corrected; reports A10 and A11, scripts A14-A17.)"
         }
       ]
     },
@@ -868,7 +868,7 @@
           "by": "P6",
           "outcome": "confirmed",
           "extent": "full",
-          "notes": "Derived the filter on log z with mean shift -g s/2 and the Jacobian, and the score in s; the cross terms cancel to give (sum b^2/f)s^2+T1 s-sum v0^2/f=0. Numerically the filter log-likelihood equals the brute-force integral over two unobserved log-sizes (-18.275599457737) and the positive roots (0.29147, 0.25190) equal the grid maxima of the filter likelihood. (first round; report A10, scripts A11.)"
+          "notes": "Derived the filter on log z with mean shift -g s/2 and the Jacobian, and the score in s; the cross terms cancel to give (sum b^2/f)s^2+T1 s-sum v0^2/f=0. Numerically the filter log-likelihood equals the brute-force integral over two unobserved log-sizes (-18.275599457737) and the positive roots (0.29147, 0.25190) equal the grid maxima of the filter likelihood. (first round; report A10, scripts A14-A16.)"
         }
       ]
     },
@@ -978,7 +978,7 @@
           "by": "P6",
           "outcome": "confirmed",
           "extent": "full",
-          "notes": "With f_t=1 and b_t=1/2 the C6 equation is s^2+4s-4m=0, root 2(sqrt(1+m)-1); the ADAM-type estimator is the smaller root of s^2-4s+4m=0, real only for m<=1 and larger than the MLE for every m in (0,1). At m=0.5625 the values are 0.677 and 0.5 (ratio 1.354); a numerical likelihood maximisation on simulated log-normal errors agreed with the formula. (first round; report A10, scripts A11.)"
+          "notes": "With f_t=1 and b_t=1/2 the C6 equation is s^2+4s-4m=0, root 2(sqrt(1+m)-1); the ADAM-type estimator is the smaller root of s^2-4s+4m=0, real only for m<=1 and larger than the MLE for every m in (0,1). At m=0.5625 the values are 0.677 and 0.5 (ratio 1.354); a numerical likelihood maximisation on simulated log-normal errors agreed with the formula. (first round; report A10, scripts A14-A16.)"
         }
       ]
     },
@@ -1097,7 +1097,7 @@
           "by": "P6",
           "outcome": "confirmed",
           "extent": "full",
-          "notes": "P(0<=y<=u)=(1-p)+pF_z(u) for positive sizes, so coverage c>1-p needs F_z(u)=(c-(1-p))/p, a quantile of the size distribution whose mean is mu_hat while E(y)=p mu_hat. Monte Carlo with p=0.4, c=0.9 gave coverage 0.8997 and size level 0.7500. (second round, on the claim as corrected; report A10, scripts A11.)"
+          "notes": "P(0<=y<=u)=(1-p)+pF_z(u) for positive sizes, so coverage c>1-p needs F_z(u)=(c-(1-p))/p, a quantile of the size distribution whose mean is mu_hat while E(y)=p mu_hat. Monte Carlo with p=0.4, c=0.9 gave coverage 0.8997 and size level 0.7500. (second round, on the claim as corrected; reports A10 and A11, scripts A14-A17.)"
         }
       ]
     },
@@ -1178,7 +1178,7 @@
           "by": "P6",
           "outcome": "confirmed",
           "extent": "full",
-          "notes": "Taking logs of D6 gives the additive ETS(A,Ad,A) recursion with innovation u_t=log(1+eps); in D7 the innovation is log(1+g eps), and log(1+g eps)/(g log(1+eps)) is not constant for 0<g<1. Simulated ETS(M,Md,M) matched the log-linear recursion to 2e-15 and the ratio took values 0.78 to 1.26. (first round; report A10, scripts A11.)"
+          "notes": "Taking logs of D6 gives the additive ETS(A,Ad,A) recursion with innovation u_t=log(1+eps); in D7 the innovation is log(1+g eps), and log(1+g eps)/(g log(1+eps)) is not constant for 0<g<1. Simulated ETS(M,Md,M) matched the log-linear recursion to 2e-15 and the ratio took values 0.78 to 1.26. (first round; report A10, scripts A14-A16.)"
         }
       ]
     },
@@ -1262,7 +1262,7 @@
           "by": "P6",
           "outcome": "confirmed",
           "extent": "full",
-          "notes": "Verified that the integral of f log f equals -H_z (Gamma and Normal, to 1e-8), so the term that D4 now defines equals -H_z and the entropy enters with a negative sign. The earlier circularity is gone because D4 no longer fixes the sign. (second round, on the claim as corrected; report A10, scripts A11.)"
+          "notes": "Verified that the integral of f log f equals -H_z (Gamma and Normal, to 1e-8), so the term that D4 now defines equals -H_z and the entropy enters with a negative sign. The earlier circularity is gone because D4 no longer fixes the sign. (second round, on the claim as corrected; reports A10 and A11, scripts A14-A17.)"
         }
       ]
     },
@@ -1355,7 +1355,7 @@
           "by": "P6",
           "outcome": "confirmed",
           "extent": "full",
-          "notes": "D8 with w=F=1, g=alpha and P=0 gives P=(j-1)alpha^2, f=P+1, k=(P+alpha)/f, the stated formula; j=1 gives alpha and the limit is 1. The recursion matched the formula to 1e-14 for alpha in {0.1,0.3,0.7}, j=1..7, and a Monte Carlo regression gave 0.4487 against 0.4488. (first round; report A10, scripts A11.)"
+          "notes": "D8 with w=F=1, g=alpha and P=0 gives P=(j-1)alpha^2, f=P+1, k=(P+alpha)/f, the stated formula; j=1 gives alpha and the limit is 1. The recursion matched the formula to 1e-14 for alpha in {0.1,0.3,0.7}, j=1..7, and a Monte Carlo regression gave 0.4487 against 0.4488. (first round; report A10, scripts A14-A16.)"
         }
       ]
     },
@@ -1499,7 +1499,7 @@
           "by": "P6",
           "outcome": "confirmed",
           "extent": "full",
-          "notes": "Re-derived E(z_{T+h}|Y_T)=mu_hat [E(1+eps)^alpha]^(h-1) for ETS(M,N,N), the strict Jensen inequality for 0<alpha<1 and non-degenerate errors, and the Gamma moment s^alpha Gamma(1/s+alpha)/Gamma(1/s). With s=0.32, alpha=0.21 the factor is 0.97309 and simulated conditional means for h=2,5,12 matched its powers within Monte Carlo error. (second round, on the claim as corrected; report A10, scripts A11.)"
+          "notes": "Re-derived E(z_{T+h}|Y_T)=mu_hat [E(1+eps)^alpha]^(h-1) for ETS(M,N,N), the strict Jensen inequality for 0<alpha<1 and non-degenerate errors, and the Gamma moment s^alpha Gamma(1/s+alpha)/Gamma(1/s). With s=0.32, alpha=0.21 the factor is 0.97309 and simulated conditional means for h=2,5,12 matched its powers within Monte Carlo error. (second round, on the claim as corrected; reports A10 and A11, scripts A14-A17.)"
         }
       ]
     },
@@ -3558,10 +3558,43 @@
         "level": "public"
       },
       "licence": "CC-BY-4.0",
-      "description": "Report of the independent proof check by the contributor P6 (first round, 2026-11-11): for C1, C2, C5, C6, C8, C10, C12, C14, C16 and C19, the re-derivation, the numerical spot checks, the outcome and the gaps found; with proof-checks.json, proof-checks-2.md and proof-checks-2.json (the second round, on C2, C5, C10, C14 and C19 as corrected after the first) in the same folder."
+      "description": "Report of the first round of the independent proof check by the contributor P6 (2026-11-11): for C1, C2, C5, C6, C8, C10, C12, C14, C16 and C19, the re-derivation, the numerical spot checks, the outcome and the gaps found."
     },
     {
       "id": "A11",
+      "kind": "proof",
+      "uri": "files/proof-checks/proof-checks-2.md",
+      "version": "sha256:1ba26c97d75792bd6d91d375288b585b375e459560b131ad4102b5762e7dbbf7",
+      "availability": {
+        "level": "public"
+      },
+      "licence": "CC-BY-4.0",
+      "description": "Report of the second round of the independent proof check by P6 (2026-11-11), on C2, C5, C10, C14 and C19 as corrected after the first round, and on the smaller changes to C1, C6, C8 and C16."
+    },
+    {
+      "id": "A12",
+      "kind": "data",
+      "uri": "files/proof-checks/proof-checks.json",
+      "version": "sha256:6d51a427bbf6ae28ed6a27fc951122e3f4c75599d524d16a86c2e02440781d8b",
+      "availability": {
+        "level": "public"
+      },
+      "licence": "CC-BY-4.0",
+      "description": "The outcomes of the first round of the proof check, one record per claim."
+    },
+    {
+      "id": "A13",
+      "kind": "data",
+      "uri": "files/proof-checks/proof-checks-2.json",
+      "version": "sha256:65ad6eb15d5da30bf17d10d6cb8d299e4413cd0a193b106673bdae07d179352a",
+      "availability": {
+        "level": "public"
+      },
+      "licence": "CC-BY-4.0",
+      "description": "The outcomes of the second round of the proof check, one record per claim."
+    },
+    {
+      "id": "A14",
       "kind": "code",
       "uri": "files/proof-checks/chk1.py",
       "version": "sha256:88de8878db174afda5c9a385d6d46bd0b00e744ce5fa8402814f47aa9d65db8f",
@@ -3569,7 +3602,40 @@
         "level": "public"
       },
       "licence": "LGPL-2.1-only",
-      "description": "The numerical spot checks of the independent proof check (chk1.py to chk4.py in the same folder; Python with numpy)."
+      "description": "Numerical spot checks of the first round of the proof check (Python with numpy); the report A10 says which claim each serves."
+    },
+    {
+      "id": "A15",
+      "kind": "code",
+      "uri": "files/proof-checks/chk2.py",
+      "version": "sha256:e83caee9e69890fd5dbde71fa35400408bff35931dc748cddc9dcf877b1f70b3",
+      "availability": {
+        "level": "public"
+      },
+      "licence": "LGPL-2.1-only",
+      "description": "Numerical spot checks of the proof check (Python with numpy), used in both rounds; the reports A10 and A11 say which claim each serves."
+    },
+    {
+      "id": "A16",
+      "kind": "code",
+      "uri": "files/proof-checks/chk3.py",
+      "version": "sha256:c87a752acc6bbb6816fce17692a752be300da8ab53fa3ddb769164084a8b3833",
+      "availability": {
+        "level": "public"
+      },
+      "licence": "LGPL-2.1-only",
+      "description": "Numerical spot checks of the proof check (Python with numpy), used in both rounds; the reports A10 and A11 say which claim each serves."
+    },
+    {
+      "id": "A17",
+      "kind": "code",
+      "uri": "files/proof-checks/chk4.py",
+      "version": "sha256:aef765b48df441007f23a0a6bce88cc0b3b17256ea1a39f7fcdda49546002237",
+      "availability": {
+        "level": "public"
+      },
+      "licence": "LGPL-2.1-only",
+      "description": "Numerical spot checks of the second round of the proof check (Python with numpy); the report A11 says which claim each serves."
     }
   ],
   "references": [

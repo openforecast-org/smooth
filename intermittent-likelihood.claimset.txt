@@ -303,8 +303,14 @@ A6 [table] Mean, bias, Monte Carlo standard error, relative bias and number of f
 A7 [table] Upper bound of the 90% prediction interval of ETS(M,N,N) divided by the point forecast, approximate against simulated, for Gamma, inverse Gaussian and log-normal errors under the ADAM and conventional forms, twelve steps ahead and after six unobserved periods at the end of the sample.
 A8 [table] Median and interquartile range of run times of the low-rank and full-covariance SSOE Kalman filter for ADAM ETS(A,N,A) with lags 24 and 168 on 1344 hourly observations with 1 to 48 missing values, with speed-ups and the largest differences in log-likelihood and fitted values.
 A9 [table] Kullback-Leibler divergence, in both directions, between the exact convolution of Laplace, S and Generalised Normal errors with normal state uncertainty and its family-scaled, one-step and Gauss-Hermite approximations, for variance ratios $f_t$ from 1.01 to 100.
-A10 [proof] Report of the independent proof check by the contributor P6 (first round, 2026-11-11): for C1, C2, C5, C6, C8, C10, C12, C14, C16 and C19, the re-derivation, the numerical spot checks, the outcome and the gaps found; with proof-checks.json, proof-checks-2.md and proof-checks-2.json (the second round, on C2, C5, C10, C14 and C19 as corrected after the first) in the same folder.
-A11 [code] The numerical spot checks of the independent proof check (chk1.py to chk4.py in the same folder; Python with numpy).
+A10 [proof] Report of the first round of the independent proof check by the contributor P6 (2026-11-11): for C1, C2, C5, C6, C8, C10, C12, C14, C16 and C19, the re-derivation, the numerical spot checks, the outcome and the gaps found.
+A11 [proof] Report of the second round of the independent proof check by P6 (2026-11-11), on C2, C5, C10, C14 and C19 as corrected after the first round, and on the smaller changes to C1, C6, C8 and C16.
+A12 [data] The outcomes of the first round of the proof check, one record per claim.
+A13 [data] The outcomes of the second round of the proof check, one record per claim.
+A14 [code] Numerical spot checks of the first round of the proof check (Python with numpy); the report A10 says which claim each serves.
+A15 [code] Numerical spot checks of the proof check (Python with numpy), used in both rounds; the reports A10 and A11 say which claim each serves.
+A16 [code] Numerical spot checks of the proof check (Python with numpy), used in both rounds; the reports A10 and A11 say which claim each serves.
+A17 [code] Numerical spot checks of the second round of the proof check (Python with numpy); the report A11 says which claim each serves.
 
 REFERENCES
 B1 10.1111/j.2517-6161.1977.tb01600.x (doi)

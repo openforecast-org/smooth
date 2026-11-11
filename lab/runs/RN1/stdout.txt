@@ -1,0 +1,22 @@
+max relative difference of fitted values over all cases, smooth TBATS vs De Livera recursion {'seeds': '[1, 2]', 'cases': 72} 0.5571639041738827
+max absolute in-sample error, noise-free harmonic series, backcasting {'periods': '7.3+24', 'harmonics': '[2, 3]', 'n': 300} 1.8474111129762605e-13
+max absolute difference of the impulse response of smooth TBATS from alpha + phi^j, lags 1-20 {'alpha': 0.1, 'phi': -0.5} 0.0
+max absolute difference of the impulse response of smooth TBATS from ARMA-errors response, lags 1-20 {'alpha': 0.1, 'phi': -0.5} 0.04999999999999999
+max absolute difference of the impulse response of smooth TBATS from alpha + phi^j, lags 1-20 {'alpha': 0.1, 'phi': 0.3} 0.0
+max absolute difference of the impulse response of smooth TBATS from ARMA-errors response, lags 1-20 {'alpha': 0.1, 'phi': 0.3} 0.04285714285216173
+max absolute difference of the impulse response of smooth TBATS from alpha + phi^j, lags 1-20 {'alpha': 0.1, 'phi': 0.8} 1.1102230246251565e-16
+max absolute difference of the impulse response of smooth TBATS from ARMA-errors response, lags 1-20 {'alpha': 0.1, 'phi': 0.8} 0.3942353924769658
+max absolute difference of the impulse response of smooth TBATS from alpha + phi^j, lags 1-20 {'alpha': 0.3, 'phi': -0.5} 0.0
+max absolute difference of the impulse response of smooth TBATS from ARMA-errors response, lags 1-20 {'alpha': 0.3, 'phi': -0.5} 0.15000000000000002
+max absolute difference of the impulse response of smooth TBATS from alpha + phi^j, lags 1-20 {'alpha': 0.3, 'phi': 0.3} 5.551115123125783e-17
+max absolute difference of the impulse response of smooth TBATS from ARMA-errors response, lags 1-20 {'alpha': 0.3, 'phi': 0.3} 0.12857142855648523
+max absolute difference of the impulse response of smooth TBATS from alpha + phi^j, lags 1-20 {'alpha': 0.3, 'phi': 0.8} 1.1102230246251565e-16
+max absolute difference of the impulse response of smooth TBATS from ARMA-errors response, lags 1-20 {'alpha': 0.3, 'phi': 0.8} 1.1827061774308976
+max absolute difference of the impulse response of smooth TBATS from alpha + phi^j, lags 1-20 {'alpha': 0.7, 'phi': -0.5} 0.0
+max absolute difference of the impulse response of smooth TBATS from ARMA-errors response, lags 1-20 {'alpha': 0.7, 'phi': -0.5} 0.3500000000000001
+max absolute difference of the impulse response of smooth TBATS from alpha + phi^j, lags 1-20 {'alpha': 0.7, 'phi': 0.3} 0.0
+max absolute difference of the impulse response of smooth TBATS from ARMA-errors response, lags 1-20 {'alpha': 0.7, 'phi': 0.3} 0.29999999996513216
+max absolute difference of the impulse response of smooth TBATS from alpha + phi^j, lags 1-20 {'alpha': 0.7, 'phi': 0.8} 2.220446049250313e-16
+max absolute difference of the impulse response of smooth TBATS from ARMA-errors response, lags 1-20 {'alpha': 0.7, 'phi': 0.8} 2.7596477473387604
+max absolute difference of smooth's impulse response from alpha + phi^j over all cases  2.220446049250313e-16
+min over cases of the max absolute difference of smooth's impulse response from the ARMA-errors response  0.04285714285216173

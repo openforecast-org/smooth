@@ -18,7 +18,7 @@ of seasonal naive 168 for that series, and no interval (its test values count as
 uncovered); the failures are counted.
 
 Measures: MASE (scaled by the in-sample mean absolute seasonal difference at lag 24, as
-in M4), sMAPE, the coverage of the 95% intervals, the elapsed seconds per series.
+in M4), the coverage of the 95% intervals, the elapsed seconds per series.
 Statistics of smooth TBATS against each comparator: the geometric mean over series of
 the ratio of MASEs (relative MASE) with its 99% t-interval on the log scale, and
 one-sided t-tests on the mean log ratio at the 1% level: non-inferiority with the margin
@@ -164,8 +164,6 @@ def measures(row, y, actual):
         "series": row["series"], "method": row["method"], "failed": failed,
         "status": row["status"], "seconds": row["seconds"],
         "MASE": float(np.mean(np.abs(actual - mean)) / scale),
-        "sMAPE": float(np.mean(200 * np.abs(actual - mean)
-                               / (np.abs(actual) + np.abs(mean)))),
         "coverage": 0.0 if failed else np.nan,
     }
     if not failed and row["lower"] is not None:
@@ -227,8 +225,6 @@ def statistics(table, split):
              "conditions": {**base, "method": method, "statistic": "mean"}},
             {"variable": "MASE", "value": float(group["MASE"].median()),
              "conditions": {**base, "method": method, "statistic": "median"}},
-            {"variable": "sMAPE", "value": float(group["sMAPE"].mean()),
-             "conditions": {**base, "method": method, "statistic": "mean"}},
             {"variable": "elapsed time", "value": float(group["seconds"].median()),
              "unit": "s", "conditions": {**base, "method": method,
                                          "statistic": "median"}},

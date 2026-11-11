@@ -247,7 +247,7 @@
     {
       "id": "D4",
       "term": "entropy-augmented likelihood",
-      "definition": "The objective of the iETS estimator of Svetunkov and Boylan (2023, eq. B.6): the sum of the one-step log-densities of the observed demand sizes, minus the differential entropy $H_z(\\hat\\mu_t,\\sigma)$ of the size at each period with zero demand, plus the Bernoulli log-likelihood of the occurrence.",
+      "definition": "The objective of the iETS estimator of Svetunkov and Boylan (2023, eq. B.6): the sum of the one-step log-densities of the observed demand sizes, plus, for each period with zero demand, the expected log-density of the unobserved size under its own distribution, $\\int f_z\\log f_z\\,dz$, plus the Bernoulli log-likelihood of the occurrence.",
       "kind": "concept",
       "source": "B4"
     },
@@ -430,7 +430,7 @@
   "claims": [
     {
       "id": "C1",
-      "statement": "For a model of intermittent demand $y_t=o_tz_t$ with Bernoulli occurrence $o_t\\sim\\text{Bernoulli}(p_t)$ independent of a continuous size $z_t$, the [[D3:observed-data likelihood]] is $$\\sum_{O_t=1}\\log f(z_t\\mid Y_{t-1};\\theta) + \\sum_{O_t=1}\\log p_t + \\sum_{O_t=0}\\log(1-p_t),$$ in which the unobserved sizes do not appear and the size and occurrence parts separate.",
+      "statement": "For a model of intermittent demand $y_t=o_tz_t$ with Bernoulli occurrence $o_t\\sim\\text{Bernoulli}(p_t)$ independent of a positive continuous size $z_t$, the [[D3:observed-data likelihood]] is $$\\sum_{O_t=1}\\log f(z_t\\mid Y_{t-1};\\theta) + \\sum_{O_t=1}\\log p_t + \\sum_{O_t=0}\\log(1-p_t),$$ in which the unobserved sizes do not appear and the size and occurrence parts separate.",
       "about": {
         "subject": "D3",
         "relation": "separates into a size part and an occurrence part for",
@@ -462,11 +462,26 @@
         "C32"
       ],
       "verification": "unchecked",
-      "provenance": "author_stated"
+      "provenance": "author_stated",
+      "relations": [
+        {
+          "type": "extends",
+          "reference": "B1",
+          "self": false,
+          "note": "Dempster, Laird and Rubin define the EM algorithm, which maximises the likelihood of incomplete data through the expected complete-data log-likelihood."
+        },
+        {
+          "type": "extends",
+          "reference": "B4",
+          "locator": "Appendix B, eq. B.6",
+          "self": true,
+          "note": "Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand."
+        }
+      ]
     },
     {
       "id": "C2",
-      "statement": "The stationary points of the [[D4:entropy-augmented likelihood]] of iETS differ in general from those of the [[D3:observed-data likelihood]], because the entropy term $-H_z(\\theta)$ has a non-zero gradient in the parameters while the cross-entropy of the EM E-step has zero gradient at the current estimate.",
+      "statement": "The stationary points of the [[D4:entropy-augmented likelihood]] of iETS differ in general from those of the [[D3:observed-data likelihood]]: at a fixed point of the EM algorithm the gradient of the expected complete-data log-likelihood equals the score of the observed-data likelihood, while the term $-H_z(\\theta)$ of each period with zero demand has a gradient that is not zero in general, and for normal sizes with fixed location the two objectives are stationary at different variances.",
       "about": {
         "subject": "D4",
         "relation": "has stationary points that differ in general from those of",
@@ -507,10 +522,10 @@
       "relations": [
         {
           "type": "contradicts",
-          "target": "doi:10.1016/j.ijpe.2023.109013",
-          "id_type": "doi",
+          "reference": "B4",
           "locator": "Appendix B, eq. B.6 (likelihood with the differential entropy of the unobserved sizes, derived by analogy with the EM algorithm)",
-          "self": true
+          "self": true,
+          "note": "Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand."
         }
       ]
     },
@@ -555,7 +570,16 @@
           "notes": "The independent proof checker re-derived the proof of E3 step by step and confirmed it."
         }
       ],
-      "provenance": "author_stated"
+      "provenance": "author_stated",
+      "relations": [
+        {
+          "type": "extends",
+          "reference": "B4",
+          "locator": "Appendix B, eq. B.6",
+          "self": true,
+          "note": "Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand."
+        }
+      ]
     },
     {
       "id": "C4",
@@ -611,23 +635,23 @@
       "relations": [
         {
           "type": "extends",
-          "target": "doi:10.1017/cbo9781107049994",
-          "id_type": "doi",
+          "reference": "B6",
           "locator": "Kalman filter for state space models with correlated disturbances",
-          "self": false
+          "self": false,
+          "note": "The reference gives the Kalman filter for state space models whose measurement and transition disturbances are correlated."
         },
         {
           "type": "extends",
-          "target": "doi:10.1093/acprof:oso/9780199641178.001.0001",
-          "id_type": "doi",
+          "reference": "B7",
           "locator": "Kalman filter for state space models with correlated disturbances",
-          "self": false
+          "self": false,
+          "note": "The reference gives the Kalman filter for state space models whose measurement and transition disturbances are correlated, and its treatment of missing observations."
         }
       ]
     },
     {
       "id": "C5",
-      "statement": "For pure additive single source of error models with normal errors, [[D2:unobserved period]]s and persistence vector $\\mathbf g\\neq\\mathbf 0$, the maximiser of the [[D5:zero-error recursion]] likelihood is not the maximum likelihood estimator, because the zero-error recursion uses error variance $\\sigma^2$ instead of $\\sigma^2f_t\\geq\\sigma^2$ and gain $\\mathbf g$ instead of $\\mathbf k_t$ at the observed periods after an unobserved one.",
+      "statement": "For pure additive single source of error models with normal errors and [[D2:unobserved period]]s, if $c_i=\\mathbf w'\\mathbf F^{i-1}\\mathbf g\\neq0$ for some $i$ shorter than an interval, the [[D5:zero-error recursion]] likelihood is not the observed-data likelihood and its maximiser in the error variance is in general not the maximum likelihood estimate, because at the observed period after such an interval the recursion uses the error variance $\\sigma^2$ instead of $\\sigma^2f_t>\\sigma^2$.",
       "about": {
         "subject": "D5",
         "relation": "is not the maximum likelihood estimator of",
@@ -646,7 +670,7 @@
         "data_type": "univariate time series with unobserved periods",
         "conditions": [
           "normally distributed errors",
-          "persistence vector $\\mathbf g\\neq\\mathbf 0$"
+          "$\\mathbf w'\\mathbf F^{i-1}\\mathbf g\\neq0$ for some $i$ shorter than an interval"
         ]
       },
       "support": [
@@ -669,16 +693,16 @@
       "relations": [
         {
           "type": "contradicts",
-          "target": "doi:10.1016/j.ijpe.2023.109013",
-          "id_type": "doi",
+          "reference": "B4",
           "locator": "Appendix C (estimation with zero errors at the unobserved periods)",
-          "self": true
+          "self": true,
+          "note": "Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand."
         }
       ]
     },
     {
       "id": "C6",
-      "statement": "For the [[D6:ADAM multiplicative ETS]] with the log-normal distribution and [[D2:unobserved period]]s, the [[D8:SSOE Kalman filter]] applied to $\\log z_t$, with the known error mean $-s/2$ added to the propagation and the prediction, gives the exact observed-data likelihood, and the maximum likelihood scale $s$ is the positive root of $$\\Big(\\sum \\frac{b_t^2}{f_t}\\Big)s^2+T_1s-\\sum\\frac{(v_t^0)^2}{f_t}=0,$$ where $v_t(s)=v_t^0+sb_t$ is the filter's prediction error.",
+      "statement": "For the [[D6:ADAM multiplicative ETS]] with the log-normal distribution and [[D2:unobserved period]]s, the [[D8:SSOE Kalman filter]] applied to $\\log z_t$, with the known error mean $-s/2$ added to the prediction and, multiplied by $\\mathbf g$, to the propagation, gives the exact observed-data likelihood, and the maximum likelihood scale $s$ is the positive root of $$\\Big(\\sum \\frac{b_t^2}{f_t}\\Big)s^2+T_1s-\\sum\\frac{(v_t^0)^2}{f_t}=0,$$ where $v_t(s)=v_t^0+sb_t$ is the filter's prediction error.",
       "about": {
         "subject": "D8",
         "relation": "gives in logarithms the exact observed-data likelihood of",
@@ -716,7 +740,15 @@
         "C12"
       ],
       "verification": "unchecked",
-      "provenance": "author_stated"
+      "provenance": "author_stated",
+      "relations": [
+        {
+          "type": "extends",
+          "reference": "B5",
+          "self": true,
+          "note": "The ADAM monograph defines the multiplicative ETS of ADAM with the log-normal, Gamma and inverse Gaussian distributions and estimates it by likelihood with every period observed."
+        }
+      ]
     },
     {
       "id": "C7",
@@ -764,7 +796,15 @@
           "notes": "The independent proof checker re-derived the proof of E10 step by step and confirmed it."
         }
       ],
-      "provenance": "author_stated"
+      "provenance": "author_stated",
+      "relations": [
+        {
+          "type": "extends",
+          "reference": "B5",
+          "self": true,
+          "note": "The ADAM monograph defines the multiplicative ETS of ADAM with the log-normal, Gamma and inverse Gaussian distributions and estimates it by likelihood with every period observed."
+        }
+      ]
     },
     {
       "id": "C8",
@@ -797,6 +837,7 @@
         "C36"
       ],
       "depends_on": [
+        "C15",
         "C7"
       ],
       "verification": "unchecked",
@@ -804,10 +845,10 @@
       "relations": [
         {
           "type": "contradicts",
-          "target": "doi:10.1201/9781003452652",
-          "id_type": "doi",
+          "reference": "B5",
           "locator": "estimator of the scale of the log-normal distribution",
-          "self": true
+          "self": true,
+          "note": "The ADAM monograph defines the multiplicative ETS of ADAM with the log-normal, Gamma and inverse Gaussian distributions and estimates it by likelihood with every period observed."
         }
       ]
     },
@@ -868,11 +909,19 @@
           "rationale": "Deterministic archived computation with a refinement check; one model, one grid, and values that differ from those first reported in the source draft."
         }
       ],
-      "provenance": "author_stated"
+      "provenance": "author_stated",
+      "relations": [
+        {
+          "type": "extends",
+          "reference": "B4",
+          "self": true,
+          "note": "Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand."
+        }
+      ]
     },
     {
       "id": "C10",
-      "statement": "For a model with an occurrence part and occurrence probability $p_t$, a prediction interval of the demand with coverage $c$ that counts the zeros as covered is an interval of the demand sizes with coverage $(c-(1-p_t))/p_t$, centred on the size forecast $\\hat\\mu_t$ rather than on the demand forecast $p_t\\hat\\mu_t$.",
+      "statement": "For a model with an occurrence part, occurrence probability $p_t$ and positive sizes, a prediction interval $[0,u]$ of the demand with coverage $c>1-p_t$ that counts the zeros as covered has as upper bound $u$ the quantile at level $(c-(1-p_t))/p_t$ of the distribution of the demand size, whose mean is the size forecast $\\hat\\mu_t$, not the demand forecast $p_t\\hat\\mu_t$.",
       "about": {
         "subject": "a prediction interval of the demand that counts zeros as covered",
         "relation": "is an interval of the demand sizes centred on",
@@ -888,8 +937,9 @@
       "scope": {
         "population": "models with an occurrence part (iETS, ADAM)",
         "conditions": [
-          "prediction interval of the demand that counts zeros as covered",
-          "Bernoulli occurrence independent of a continuous demand size"
+          "prediction interval of the demand of the form $[0,u]$ that counts zeros as covered",
+          "coverage $c>1-p_t$",
+          "Bernoulli occurrence independent of a positive continuous demand size"
         ]
       },
       "support": [
@@ -903,7 +953,15 @@
         "C32"
       ],
       "verification": "unchecked",
-      "provenance": "author_stated"
+      "provenance": "author_stated",
+      "relations": [
+        {
+          "type": "extends",
+          "reference": "B4",
+          "self": true,
+          "note": "Svetunkov and Boylan forecast intermittent demand as the product of the occurrence probability and the forecast demand size."
+        }
+      ]
     },
     {
       "id": "C11",
@@ -942,7 +1000,16 @@
           "rationale": "Implementation exists in the public repository; correctness relies on the package tests, not on independent verification."
         }
       ],
-      "provenance": "author_stated"
+      "provenance": "author_stated",
+      "relations": [
+        {
+          "type": "supersedes",
+          "reference": "B4",
+          "locator": "Appendix B, eq. B.6",
+          "self": true,
+          "note": "Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand."
+        }
+      ]
     },
     {
       "id": "C12",
@@ -1005,7 +1072,7 @@
     },
     {
       "id": "C14",
-      "statement": "With the [[D32:differential entropy]] defined as $H=-\\E\\log f$, the sign of the entropy term in equations 29 and B.6 of Svetunkov and Boylan (2023) should be negative.",
+      "statement": "The term that the [[D4:entropy-augmented likelihood]] adds for each period with zero demand, the expected log-density of the unobserved size under its own distribution, equals $-H_z$ with the [[D32:differential entropy]] $H_z=-\\E\\log f_z$, so the entropy enters the objective with a negative sign.",
       "about": {
         "subject": "the entropy term in eqs 29 and B.6 of Svetunkov and Boylan (2023)",
         "relation": "should have the sign",
@@ -1035,10 +1102,10 @@
       "relations": [
         {
           "type": "contradicts",
-          "target": "doi:10.1016/j.ijpe.2023.109013",
-          "id_type": "doi",
+          "reference": "B4",
           "locator": "eq. 29 and eq. B.6 (sign of the entropy term)",
-          "self": true
+          "self": true,
+          "note": "Svetunkov and Boylan add the differential entropy of the size for each period with zero demand with a positive sign in their equations 29 and B.6."
         }
       ],
       "scope": {
@@ -1097,7 +1164,7 @@
     },
     {
       "id": "C16",
-      "statement": "For ETS(A,N,N) with smoothing parameter $\\alpha$ and zero state covariance before an interval of $j$ periods, the gain of the [[D8:SSOE Kalman filter]] at the end of the interval is $$\\alpha_j=\\frac{(j-1)\\alpha^2+\\alpha}{(j-1)\\alpha^2+1},$$ which equals $\\alpha$ for $j=1$ and tends to one as $j$ grows.",
+      "statement": "For ETS(A,N,N) with smoothing parameter $\\alpha$ and zero state covariance before an interval of $j$ periods, the gain of the [[D8:SSOE Kalman filter]] at the end of the interval is $$\\alpha_j=\\frac{(j-1)\\alpha^2+\\alpha}{(j-1)\\alpha^2+1},$$ which equals $\\alpha$ for $j=1$ and tends to one as $j$ grows when $\\alpha\\neq0$.",
       "about": {
         "subject": "D8",
         "relation": "has at the end of an interval of j periods the gain",
@@ -1234,7 +1301,7 @@
     },
     {
       "id": "C19",
-      "statement": "The point forecast with zero errors of the [[D6:ADAM multiplicative ETS]] is not the conditional mean, because $\\E(1+\\epsilon_t)^{g_k}<1$ for $0<g_k<1$; for ETS(M,N,N) with Gamma errors of mean one and variance $s$ the conditional mean $h$ steps ahead is $$\\hat\\mu_{T+h}\\left[\\frac{\\Gamma(1/s+\\alpha)s^{\\alpha}}{\\Gamma(1/s)}\\right]^{h-1}.$$",
+      "statement": "For [[D20:ETS(M,N,N)]] in the [[D6:ADAM multiplicative ETS]] form with $0<\\alpha<1$ and non-degenerate errors of mean one, the point forecast with zero errors $h\\ge2$ steps ahead is not the conditional mean, because $\\E(1+\\epsilon_t)^{\\alpha}<1$; with Gamma errors of mean one and variance $s$ the conditional mean $h$ steps ahead is $$\\hat\\mu_{T+h}\\left[\\frac{\\Gamma(1/s+\\alpha)s^{\\alpha}}{\\Gamma(1/s)}\\right]^{h-1}.$$",
       "about": {
         "subject": "D6",
         "relation": "has a point forecast with zero errors below",
@@ -1248,7 +1315,11 @@
       "role": "secondary",
       "novelty": "no_prior_found",
       "scope": {
-        "population": "pure multiplicative ETS in the ADAM form"
+        "population": "ETS(M,N,N) in the ADAM form",
+        "conditions": [
+          "$0<\\alpha<1$",
+          "forecast horizon $h\\ge2$"
+        ]
       },
       "support": [
         {
@@ -1931,37 +2002,48 @@
       "steps": [
         {
           "id": "E2.1",
-          "statement": "$Q(\\theta\\mid\\theta^{(k)})$ contains at each zero the cross-entropy $\\int f_z^{(k)}\\log f_z\\,dz=-H_z(\\theta^{(k)})-\\KL(f_z^{(k)}\\|f_z)$",
+          "statement": "$$\\nabla_\\theta Q(\\theta\\mid\\theta^{(k)})\\big|_{\\theta=\\theta^{(k)}}=\\nabla\\ell(\\theta^{(k)}),$$ with $Q$ the expected complete-data log-likelihood given the observed data at $\\theta^{(k)}$ and $\\ell$ the [[D3:observed-data likelihood]]",
           "by": [
-            "D4"
+            "B1",
+            "C1"
           ],
-          "rule": "definition of the E-step"
+          "rule": "Fisher's identity (differentiation under the integral)"
         },
         {
           "id": "E2.2",
-          "statement": "$$\\partial_\\theta\\int f_z\\log f_z^{\\theta}dz\\Big|_{\\theta=\\theta^{(k)}}=\\partial_\\theta\\int f_z\\,dz=0$$",
+          "statement": "A fixed point of EM is a stationary point of $\\ell$",
           "by": [
             "E2.1"
-          ],
-          "rule": "differentiation under the integral"
-        },
-        {
-          "id": "E2.3",
-          "statement": "$\\nabla Q(\\theta\\mid\\theta^{(k)})|_{\\theta^{(k)}}=\\nabla\\ell(\\theta^{(k)})$, so EM fixed points are stationary points of $\\ell$",
-          "by": [
-            "E2.2",
-            "B1",
-            "C1"
           ],
           "rule": "EM identity"
         },
         {
-          "id": "E2.4",
-          "statement": "$-\\partial_\\theta H_z(\\theta)\\neq0$ in general (e.g. in the scale), adding to the score of $\\ell$",
+          "id": "E2.3",
+          "statement": "For normal sizes with fixed location, $$\\ell(\\sigma^2)=-\\frac{T_1}{2}\\log\\sigma^2-\\frac{S}{2\\sigma^2}+c,\\qquad S=\\sum_{O_t=1}e_t^2,$$ stationary at $\\sigma^2=S/T_1$",
           "by": [
-            "D4"
+            "C1",
+            "D3"
           ],
           "rule": "differentiation"
+        },
+        {
+          "id": "E2.4",
+          "statement": "Each zero adds $\\int f_z\\log f_z\\,dz=-\\frac12\\log(2\\pi e\\sigma^2)$, whose gradient in $\\sigma^2$ is $-1/(2\\sigma^2)\\neq0$; so the [[D4:entropy-augmented likelihood]] is $$\\ell_H(\\sigma^2)=\\ell(\\sigma^2)-\\frac{T_0}{2}\\log(2\\pi e\\sigma^2),$$ stationary at $\\sigma^2=S/T$ with $T=T_1+T_0$",
+          "by": [
+            "D4",
+            "D32",
+            "E2.3"
+          ],
+          "rule": "normal entropy and differentiation"
+        },
+        {
+          "id": "E2.5",
+          "statement": "$S/T\\neq S/T_1$ whenever $T_0>0$ and $S>0$, so the stationary points differ",
+          "by": [
+            "E2.3",
+            "E2.4"
+          ],
+          "rule": "comparison"
         }
       ],
       "artefacts": [
@@ -2122,7 +2204,7 @@
         },
         {
           "id": "E6.2",
-          "statement": "$f_t>1$ when $c_1\\neq0$, and $\\mathbf k_t\\neq\\mathbf g$ while $\\mathbf P_t\\neq\\mathbf 0$",
+          "statement": "$f_t>1$ when $c_i\\neq0$ for some $i<j$",
           "by": [
             "E6.1"
           ],
@@ -2130,13 +2212,32 @@
         },
         {
           "id": "E6.3",
-          "statement": "The zero-error recursion uses variance $\\sigma^2$ and gain $\\mathbf g$, so its objective differs from the exact likelihood",
+          "statement": "The zero-error recursion uses variance $\\sigma^2$ at every observed period, so its objective differs from the exact likelihood",
           "by": [
             "E6.2",
             "D5",
             "C4"
           ],
           "rule": "comparison"
+        },
+        {
+          "id": "E6.4",
+          "statement": "Both predict the first observed period after an interval from the states propagated by $\\mathbf F$ with zero errors, so its prediction error $e_t$ is the same in both",
+          "by": [
+            "D5",
+            "D8"
+          ],
+          "rule": "zero mean of the errors in the interval"
+        },
+        {
+          "id": "E6.5",
+          "statement": "For given other parameters the maximiser in $\\sigma^2$ is $\\frac{1}{T_1}\\sum e_t^2$ for the zero-error recursion and $\\frac{1}{T_1}\\sum v_t^2/f_t$ for the exact likelihood, which differ unless the data satisfy $\\sum e_t^2=\\sum v_t^2/f_t$, a term with $f_t>1$ and $v_t=e_t$ being present",
+          "by": [
+            "E6.2",
+            "E6.4",
+            "C4"
+          ],
+          "rule": "differentiation in $\\sigma^2$"
         }
       ],
       "artefacts": [
@@ -2156,6 +2257,7 @@
           "id": "E7.1",
           "statement": "$P=(j-1)\\alpha^2$, $f=(j-1)\\alpha^2+1$ after $j-1$ unobserved periods",
           "by": [
+            "C4",
             "D8"
           ],
           "rule": "substitution $w=F=1$, $g=\\alpha$"
@@ -2234,8 +2336,10 @@
           "id": "E9.2",
           "statement": "The filter of the linear Gaussian model with the Jacobian $-\\sum\\log z_t$ gives the exact likelihood",
           "by": [
-            "E9.1",
-            "C4"
+            "C33",
+            "C34",
+            "C4",
+            "E9.1"
           ],
           "rule": "change of variables"
         },
@@ -2348,7 +2452,7 @@
       "steps": [
         {
           "id": "E12.1",
-          "statement": "$P(y_t\\in[0,u])=(1-p_t)+p_tF_z(u)$ when zeros count as covered",
+          "statement": "$$P(0\\le y_t\\le u)=(1-p_t)+p_tF_z(u)$$ for positive sizes and occurrence independent of the size",
           "by": [
             "C31",
             "C32"
@@ -2357,11 +2461,19 @@
         },
         {
           "id": "E12.2",
-          "statement": "Setting it to $c$ gives $F_z$ coverage $(c-(1-p_t))/p_t$, a quantile of the sizes around $\\hat\\mu_t$",
+          "statement": "Setting it to $c$ with $c>1-p_t$ gives $F_z(u)=(c-(1-p_t))/p_t\\in(0,1]$, so $u$ is the quantile of the size at that level",
           "by": [
             "E12.1"
           ],
           "rule": "algebra"
+        },
+        {
+          "id": "E12.3",
+          "statement": "The size has mean $\\hat\\mu_t$, the demand $\\E(o_tz_t)=p_t\\hat\\mu_t$",
+          "by": [
+            "C31"
+          ],
+          "rule": "independence"
         }
       ],
       "artefacts": [
@@ -2383,7 +2495,7 @@
       "steps": [
         {
           "id": "E13.1",
-          "statement": "$x\\mapsto x^{g}$ is concave for $0<g<1$, so $\\E(1+\\epsilon)^{g}<(\\E(1+\\epsilon))^{g}=1$",
+          "statement": "$x\\mapsto x^{\\alpha}$ is strictly concave for $0<\\alpha<1$, so for non-degenerate $1+\\epsilon>0$ with $\\E(1+\\epsilon)=1$, $\\E(1+\\epsilon)^{\\alpha}<(\\E(1+\\epsilon))^{\\alpha}=1$",
           "by": [
             "D6"
           ],
@@ -2391,16 +2503,25 @@
         },
         {
           "id": "E13.2",
-          "statement": "For ETS(M,N,N), $\\E(z_{T+h}\\mid Y_T)=\\hat\\mu_{T+h}[\\E(1+\\epsilon)^{\\alpha}]^{h-1}$ by independence of the errors",
+          "statement": "In the ADAM form $l_t=l_{t-1}(1+\\epsilon_t)^{\\alpha}$ and $z_t=l_{t-1}(1+\\epsilon_t)$, so $$\\E(z_{T+h}\\mid Y_T)=l_T\\,[\\E(1+\\epsilon)^{\\alpha}]^{h-1}\\,\\E(1+\\epsilon)=\\hat\\mu_{T+h}[\\E(1+\\epsilon)^{\\alpha}]^{h-1},$$ with $\\hat\\mu_{T+h}=l_T$ the forecast with zero errors",
           "by": [
-            "E13.1",
+            "D6",
             "C30"
           ],
-          "rule": "independence"
+          "rule": "independence of the errors"
         },
         {
           "id": "E13.3",
-          "statement": "For Gamma with mean one and variance $s$, $\\E(1+\\epsilon)^{\\alpha}=\\Gamma(1/s+\\alpha)s^{\\alpha}/\\Gamma(1/s)$",
+          "statement": "For $h\\ge2$ the factor is below one, so the conditional mean is below the forecast with zero errors",
+          "by": [
+            "E13.1",
+            "E13.2"
+          ],
+          "rule": "substitution"
+        },
+        {
+          "id": "E13.4",
+          "statement": "For $1+\\epsilon$ Gamma with shape $1/s$ and scale $s$ (mean one, variance $s$), $\\E(1+\\epsilon)^{\\alpha}=\\Gamma(1/s+\\alpha)s^{\\alpha}/\\Gamma(1/s)$",
           "by": [
             "E13.2"
           ],
@@ -2479,7 +2600,7 @@
         },
         {
           "id": "E15.3",
-          "statement": "The term added for each period with zero demand is the expected log-density of the unobserved size under its own distribution, $\\int f_z\\log f_z\\,dz$ (the E-step analogy that motivates eq. B.6 of Svetunkov and Boylan, 2023)",
+          "statement": "The term added for each period with zero demand is the expected log-density of the unobserved size under its own distribution, $\\int f_z\\log f_z\\,dz$",
           "by": [
             "D4"
           ],
@@ -3278,6 +3399,21 @@
     {
       "id": "B4",
       "target": "10.1016/j.ijpe.2023.109013",
+      "id_type": "doi"
+    },
+    {
+      "id": "B5",
+      "target": "10.1201/9781003452652",
+      "id_type": "doi"
+    },
+    {
+      "id": "B6",
+      "target": "10.1017/cbo9781107049994",
+      "id_type": "doi"
+    },
+    {
+      "id": "B7",
+      "target": "10.1093/acprof:oso/9780199641178.001.0001",
       "id_type": "doi"
     }
   ]

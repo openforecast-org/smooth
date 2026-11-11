@@ -1,0 +1,50 @@
+MASE {'split': 'validation', 'method': 'ADAM ETS', 'statistic': 'mean'} 1.60317 
+MASE {'split': 'validation', 'method': 'ADAM ETS', 'statistic': 'median'} 1.04067 
+sMAPE {'split': 'validation', 'method': 'ADAM ETS', 'statistic': 'mean'} 10.11399 
+elapsed time {'split': 'validation', 'method': 'ADAM ETS', 'statistic': 'median'} 1.18336 
+series failed {'split': 'validation', 'method': 'ADAM ETS'} 0 
+coverage {'split': 'validation', 'method': 'ADAM ETS', 'nominal level': 0.95} 0.875 
+MASE {'split': 'validation', 'method': 'AutoTBATS', 'statistic': 'mean'} 1.39581 
+MASE {'split': 'validation', 'method': 'AutoTBATS', 'statistic': 'median'} 1.47768 
+sMAPE {'split': 'validation', 'method': 'AutoTBATS', 'statistic': 'mean'} 7.7811 
+elapsed time {'split': 'validation', 'method': 'AutoTBATS', 'statistic': 'median'} 15.0959 
+series failed {'split': 'validation', 'method': 'AutoTBATS'} 0 
+coverage {'split': 'validation', 'method': 'AutoTBATS', 'nominal level': 0.95} 0.875 
+MASE {'split': 'validation', 'method': 'forecast::tbats', 'statistic': 'mean'} 1.32397 
+MASE {'split': 'validation', 'method': 'forecast::tbats', 'statistic': 'median'} 1.31628 
+sMAPE {'split': 'validation', 'method': 'forecast::tbats', 'statistic': 'mean'} 7.17352 
+elapsed time {'split': 'validation', 'method': 'forecast::tbats', 'statistic': 'median'} 23.619 
+series failed {'split': 'validation', 'method': 'forecast::tbats'} 0 
+coverage {'split': 'validation', 'method': 'forecast::tbats', 'nominal level': 0.95} 0.82031 
+MASE {'split': 'validation', 'method': 'seasonal naive 168', 'statistic': 'mean'} 1.64712 
+MASE {'split': 'validation', 'method': 'seasonal naive 168', 'statistic': 'median'} 1.52371 
+sMAPE {'split': 'validation', 'method': 'seasonal naive 168', 'statistic': 'mean'} 9.2211 
+elapsed time {'split': 'validation', 'method': 'seasonal naive 168', 'statistic': 'median'} 8e-05 
+series failed {'split': 'validation', 'method': 'seasonal naive 168'} 0 
+MASE {'split': 'validation', 'method': 'smooth TBATS', 'statistic': 'mean'} 1.38733 
+MASE {'split': 'validation', 'method': 'smooth TBATS', 'statistic': 'median'} 1.29725 
+sMAPE {'split': 'validation', 'method': 'smooth TBATS', 'statistic': 'mean'} 7.53513 
+elapsed time {'split': 'validation', 'method': 'smooth TBATS', 'statistic': 'median'} 9.95112 
+series failed {'split': 'validation', 'method': 'smooth TBATS'} 0 
+coverage {'split': 'validation', 'method': 'smooth TBATS', 'nominal level': 0.95} 0.94792 
+relative MASE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 1.04156 {'level': 0.95, 'lower': 0.9247079430734523, 'upper': 1.173180005968886}
+series in relative MASE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 8 
+series excluded by zero MASE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 0 
+relative MASE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} 0.99648 {'level': 0.95, 'lower': 0.7793904793329299, 'upper': 1.274048562311492}
+series in relative MASE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} 8 
+series excluded by zero MASE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} 0 
+relative MASE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} 1.07599 {'level': 0.95, 'lower': 0.6490465542227968, 'upper': 1.783790512932131}
+series in relative MASE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} 8 
+series excluded by zero MASE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} 0 
+relative MASE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} 0.83223 {'level': 0.95, 'lower': 0.6665205572055912, 'upper': 1.039134430130487}
+series in relative MASE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} 8 
+series excluded by zero MASE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} 0 
+relative elapsed time {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 0.3886 {'level': 0.95, 'lower': 0.2581472249188368, 'upper': 0.5849643012758462}
+p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE) {'split': 'validation'} 0.43856 
+Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE) {'split': 'validation'} 0.63013 
+p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE) {'split': 'validation'} 0.31506 
+Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE) {'split': 'validation'} 0.63013 
+p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE) {'split': 'validation'} 0.04569 
+Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE) {'split': 'validation'} 0.13707 
+p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time) {'split': 'validation'} 0.00047 
+Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time) {'split': 'validation'} 0.00188 

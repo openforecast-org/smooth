@@ -6,7 +6,7 @@ DEFINITIONS
 D1 [method] single source of error form: State space form of a time series model, also called the innovations form, in which the observation equation and the state transition share one error term $\epsilon_t$ per period: $$\begin{aligned} z_t &= w(\mathbf v_{t-\mathbf l}) + r(\mathbf v_{t-\mathbf l})\epsilon_t \\ \mathbf v_t &= f(\mathbf v_{t-\mathbf l}) + g(\mathbf v_{t-\mathbf l})\epsilon_t. \end{aligned}$$
 D2 [concept] unobserved period: A period $t$ at which the potential value $z_t$ of the modelled variable is not observed ($O_t=0$): a period with zero demand in an intermittent demand model, where the demand size is not observed, or a period with a missing value.
 D3 [concept] observed-data likelihood: The joint density of the observed data only, obtained by integrating the complete-data likelihood over the values $\mathbf z_{\mathrm{mis}}$ at the unobserved periods: $$L(\theta)=\int f(\mathbf y_{\mathrm{obs}},\mathbf z_{\mathrm{mis}};\theta)\,d\mathbf z_{\mathrm{mis}}.$$
-D4 [concept] entropy-augmented likelihood: The objective of the iETS estimator of Svetunkov and Boylan (2023, eq. B.6): the sum of the one-step log-densities of the observed demand sizes, minus the differential entropy $H_z(\hat\mu_t,\sigma)$ of the size at each period with zero demand, plus the Bernoulli log-likelihood of the occurrence. [source B4]
+D4 [concept] entropy-augmented likelihood: The objective of the iETS estimator of Svetunkov and Boylan (2023, eq. B.6): the sum of the one-step log-densities of the observed demand sizes, plus, for each period with zero demand, the expected log-density of the unobserved size under its own distribution, $\int f_z\log f_z\,dz$, plus the Bernoulli log-likelihood of the occurrence. [source B4]
 D5 [method] zero-error recursion: The estimator used in ADAM and in iETS (Svetunkov and Boylan 2023, Appendix C): the single source of error recursion run with $\epsilon_t=0$ at the unobserved periods and with the fixed persistence vector $\mathbf g$ at the observed ones, with the likelihood taken as the product of one-step densities at the observed periods. [source B4]
 D6 [method] ADAM multiplicative ETS: Pure multiplicative exponential smoothing in the form of the Augmented Dynamic Adaptive Model, in which each component $k$ is updated by the factor $(1+\epsilon_t)^{g_k}$; for ETS(M,Md,M) with seasonal period $m$, $$\begin{aligned} z_t &= l_{t-1}b_{t-1}^{\phi}s_{t-m}(1+\epsilon_t) \\ l_t &= l_{t-1}b_{t-1}^{\phi}(1+\epsilon_t)^{\alpha} \\ b_t &= b_{t-1}^{\phi}(1+\epsilon_t)^{\beta} \\ s_t &= s_{t-m}(1+\epsilon_t)^{\gamma}. \end{aligned}$$
 D7 [method] conventional multiplicative ETS: Pure multiplicative exponential smoothing in the form of Hyndman et al. (2008), in which each component $k$ is updated by the factor $1+g_k\epsilon_t$; for ETS(M,Md,M) with seasonal period $m$, $$\begin{aligned} z_t &= l_{t-1}b_{t-1}^{\phi}s_{t-m}(1+\epsilon_t) \\ l_t &= l_{t-1}b_{t-1}^{\phi}(1+\alpha\epsilon_t) \\ b_t &= b_{t-1}^{\phi}(1+\beta\epsilon_t) \\ s_t &= s_{t-m}(1+\gamma\epsilon_t). \end{aligned}$$
@@ -34,47 +34,56 @@ D28 [method] family-scaled error: The approximation of the predictive density of
 D29 [method] Gauss-Hermite mixture: The mixture of the error density over the normal uncertainty of the states by a Gauss-Hermite rule with $Q$ nodes (16 in the smooth package).
 D30 [data] additive errors with state uncertainty: Laplace, S and Generalised Normal (shape 0.5 to 3) errors with scale $s=1$, convolved with normal state uncertainty of variance $(f_t-1)V(s)$, for 22 values of $f_t$ from 1.01 to 100 (kl_laplace.py).
 D31 [design] divergence by numerical integration: The Kullback-Leibler divergence in both directions between the exact convolution and each approximation, by composite 8-node Gauss-Legendre integration (kl_laplace.py).
+D32 [concept] differential entropy: For a size with density $f_z$, $$H_z = -\E\log f_z = -\int f_z(z)\log f_z(z)\,dz.$$
 
 CLAIMS
-C1 [formal; principal; support: formal_proof E1; assumes C30, C31, C32; verification unchecked]
-  For a model of intermittent demand $y_t=o_tz_t$ with Bernoulli occurrence $o_t\sim\text{Bernoulli}(p_t)$ independent of a continuous size $z_t$, the [[D3:observed-data likelihood]] is $$\sum_{O_t=1}\log f(z_t\mid Y_{t-1};\theta) + \sum_{O_t=1}\log p_t + \sum_{O_t=0}\log(1-p_t),$$ in which the unobserved sizes do not appear and the size and occurrence parts separate.
+C1 [formal; principal; support: formal_proof E1; assumes C30, C31, C32; verification agent_checked]
+  For a model of intermittent demand $y_t=o_tz_t$ with Bernoulli occurrence $o_t\sim\text{Bernoulli}(p_t)$ independent of a positive continuous size $z_t$, the [[D3:observed-data likelihood]] is $$\sum_{O_t=1}\log f(z_t\mid Y_{t-1};\theta) + \sum_{O_t=1}\log p_t + \sum_{O_t=0}\log(1-p_t),$$ in which the unobserved sizes do not appear and the size and occurrence parts separate.
   scope: population: models of intermittent demand $y_t=o_tz_t$ (iETS, ADAM with an occurrence part) | data_type: intermittent demand time series | conditions: Bernoulli occurrence independent of a continuous demand size
-C2 [formal; principal; refutation; support: formal_proof E2, cited B1; assumes C31, C32; uses C1; verification unchecked]
-  The stationary points of the [[D4:entropy-augmented likelihood]] of iETS differ in general from those of the [[D3:observed-data likelihood]], because the entropy term $-H_z(\theta)$ has a non-zero gradient in the parameters while the cross-entropy of the EM E-step has zero gradient at the current estimate.
+  extends B1: Dempster, Laird and Rubin define the EM algorithm, which maximises the likelihood of incomplete data through the expected complete-data log-likelihood.
+  extends B4, at Appendix B, eq. B.6, own earlier work: Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand.
+C2 [formal; principal; refutation; support: formal_proof E2, cited B1; assumes C31, C32; uses C1; verification agent_checked]
+  The stationary points of the [[D4:entropy-augmented likelihood]] of iETS differ in general from those of the [[D3:observed-data likelihood]]: at a fixed point of the EM algorithm the gradient of the expected complete-data log-likelihood equals the score of the observed-data likelihood, while the term $-H_z(\theta)$ of each period with zero demand has a gradient that is not zero in general, and for normal sizes with fixed location the two objectives are stationary at different variances.
   scope: population: iETS estimated by the entropy-augmented likelihood | data_type: intermittent demand time series | conditions: sizes unobserved at the periods with zero demand
-  contradicts doi doi:10.1016/j.ijpe.2023.109013, at Appendix B, eq. B.6 (likelihood with the differential entropy of the unobserved sizes, derived by analogy with the EM algorithm), own earlier work
+  contradicts B4, at Appendix B, eq. B.6 (likelihood with the differential entropy of the unobserved sizes, derived by analogy with the EM algorithm), own earlier work: Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand.
 C3 [formal; principal; support: formal_proof E3; uses C2; verification agent_checked]
   For normally distributed demand sizes with fixed location, the maximiser in the variance of the [[D4:entropy-augmented likelihood]] is $\frac{T_1}{T}\hat\sigma^2$, where $\hat\sigma^2=\frac{1}{T_1}\sum_{O_t=1}e_t^2$ is the fixed point of the EM algorithm, $T$ the number of periods and $T_1$ the number of periods with observed sizes.
   scope: population: iETS with normally distributed demand sizes | conditions: location of the sizes held fixed; variance as the only free parameter
+  extends B4, at Appendix B, eq. B.6, own earlier work: Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand.
 C4 [formal; principal; extension; support: formal_proof E4; assumes C30, C33, C34, C35; uses C1; verification agent_checked]
   For a pure additive single source of error model with normal errors and [[D2:unobserved period]]s, the [[D8:SSOE Kalman filter]] gives $z_t\mid Y_{t-1}\sim\mathcal N(\mathbf w'\mathbf a_t,\sigma^2 f_t)$ at the observed periods, the exact observed-data log-likelihood $$-\frac12\sum_{O_t=1}\left[\log(2\pi\sigma^2f_t)+\frac{v_t^2}{\sigma^2f_t}\right],$$ and the concentrated variance $$\hat\sigma^2=\frac{1}{T_1}\sum_{O_t=1}\frac{v_t^2}{f_t}.$$
   scope: population: pure additive single source of error models (ETS with additive components, ARIMA, regression) | data_type: univariate time series with unobserved periods | conditions: normally distributed errors; initial states treated as fixed parameters | excludes: models mixing additive and multiplicative components
-  extends doi doi:10.1017/cbo9781107049994, at Kalman filter for state space models with correlated disturbances
-  extends doi doi:10.1093/acprof:oso/9780199641178.001.0001, at Kalman filter for state space models with correlated disturbances
-C5 [formal; principal; refutation; support: formal_proof E6; assumes C30, C33, C34, C35; uses C4; verification unchecked]
-  For pure additive single source of error models with normal errors, [[D2:unobserved period]]s and persistence vector $\mathbf g\neq\mathbf 0$, the maximiser of the [[D5:zero-error recursion]] likelihood is not the maximum likelihood estimator, because the zero-error recursion uses error variance $\sigma^2$ instead of $\sigma^2f_t\geq\sigma^2$ and gain $\mathbf g$ instead of $\mathbf k_t$ at the observed periods after an unobserved one.
-  scope: population: pure additive single source of error models | data_type: univariate time series with unobserved periods | conditions: normally distributed errors; persistence vector $\mathbf g\neq\mathbf 0$
-  contradicts doi doi:10.1016/j.ijpe.2023.109013, at Appendix C (estimation with zero errors at the unobserved periods), own earlier work
-C6 [formal; principal; support: formal_proof E9; assumes C30, C33, C34, C36; uses C4, C12; verification unchecked]
-  For the [[D6:ADAM multiplicative ETS]] with the log-normal distribution and [[D2:unobserved period]]s, the [[D8:SSOE Kalman filter]] applied to $\log z_t$, with the known error mean $-s/2$ added to the propagation and the prediction, gives the exact observed-data likelihood, and the maximum likelihood scale $s$ is the positive root of $$\Big(\sum \frac{b_t^2}{f_t}\Big)s^2+T_1s-\sum\frac{(v_t^0)^2}{f_t}=0,$$ where $v_t(s)=v_t^0+sb_t$ is the filter's prediction error.
+  extends B6, at Kalman filter for state space models with correlated disturbances: The reference gives the Kalman filter for state space models whose measurement and transition disturbances are correlated.
+  extends B7, at Kalman filter for state space models with correlated disturbances: The reference gives the Kalman filter for state space models whose measurement and transition disturbances are correlated, and its treatment of missing observations.
+C5 [formal; principal; refutation; support: formal_proof E6; assumes C30, C33, C34, C35; uses C4; verification agent_checked]
+  For pure additive single source of error models with normal errors and [[D2:unobserved period]]s, if $c_i=\mathbf w'\mathbf F^{i-1}\mathbf g\neq0$ for some $i$ shorter than an interval, the [[D5:zero-error recursion]] likelihood is not the observed-data likelihood and its maximiser in the error variance is in general not the maximum likelihood estimate, because at the observed period after such an interval the recursion uses the error variance $\sigma^2$ instead of $\sigma^2f_t>\sigma^2$.
+  scope: population: pure additive single source of error models | data_type: univariate time series with unobserved periods | conditions: normally distributed errors; $\mathbf w'\mathbf F^{i-1}\mathbf g\neq0$ for some $i$ shorter than an interval
+  contradicts B4, at Appendix C (estimation with zero errors at the unobserved periods), own earlier work: Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand.
+C6 [formal; principal; support: formal_proof E9; assumes C30, C33, C34, C36; uses C4, C12; verification agent_checked]
+  For the [[D6:ADAM multiplicative ETS]] with the log-normal distribution and [[D2:unobserved period]]s, the [[D8:SSOE Kalman filter]] applied to $\log z_t$, with the known error mean $-s/2$ added to the prediction and, multiplied by $\mathbf g$, to the propagation, gives the exact observed-data likelihood, and the maximum likelihood scale $s$ is the positive root of $$\Big(\sum \frac{b_t^2}{f_t}\Big)s^2+T_1s-\sum\frac{(v_t^0)^2}{f_t}=0,$$ where $v_t(s)=v_t^0+sb_t$ is the filter's prediction error.
   scope: population: pure multiplicative ETS in the ADAM form | data_type: positive univariate time series with unobserved periods | conditions: log-normal distribution with $\E(1+\epsilon_t)=1$
+  extends B5, own earlier work: The ADAM monograph defines the multiplicative ETS of ADAM with the log-normal, Gamma and inverse Gaussian distributions and estimates it by likelihood with every period observed.
 C7 [formal; principal; support: formal_proof E10; assumes C30, C36; uses C6; verification agent_checked]
   For the [[D6:ADAM multiplicative ETS]] with the log-normal distribution and all periods observed, the maximum likelihood estimate of the scale is $\hat s=2(\sqrt{1+m}-1)$ with $m=\frac{1}{T_1}\sum\log^2(1+\epsilon_t)$.
   scope: population: pure multiplicative ETS in the ADAM form | data_type: positive univariate time series | conditions: log-normal distribution with $\E(1+\epsilon_t)=1$; every period observed
-C8 [formal; principal; refutation; support: formal_proof E10; assumes C36; uses C7; verification unchecked]
+  extends B5, own earlier work: The ADAM monograph defines the multiplicative ETS of ADAM with the log-normal, Gamma and inverse Gaussian distributions and estimates it by likelihood with every period observed.
+C8 [formal; principal; refutation; support: formal_proof E10; assumes C36; uses C15, C7; verification agent_checked]
   The log-normal scale estimator $2(1-\sqrt{1-m})$ used in ADAM, with $m=\frac{1}{T_1}\sum\log^2(1+\epsilon_t)$, is not the maximum likelihood estimator: it overestimates the scale $s$ by about 35% at $s=0.5$ (0.677 against 0.5 when $m=s+s^2/4$) and is undefined for $m>1$.
   scope: population: pure multiplicative ETS in the ADAM form | data_type: positive univariate time series | conditions: log-normal distribution with $\E(1+\epsilon_t)=1$; every period observed
-  contradicts doi doi:10.1201/9781003452652, at estimator of the scale of the log-normal distribution, own earlier work
+  contradicts B5, at estimator of the scale of the log-normal distribution, own earlier work: The ADAM monograph defines the multiplicative ETS of ADAM with the log-normal, Gamma and inverse Gaussian distributions and estimates it by likelihood with every period observed.
 C9 [descriptive; principal; support: simulation E20 (E20.T1.r1, E20.T1.r2, E20.T1.r3) artefacts A3, A4, A5; assumes C37; strength moderate (author)]
   For [[D12:iETS(M,N,N)]] in the [[D7:conventional multiplicative ETS]] form, the [[D10:normal-drift mixture density]] of the demand size after an interval had a largest [[D14:Kullback-Leibler divergence]] per observation from the exact density at least three orders of magnitude smaller than that of [[D11:the one-step density]], for the Gamma, the log-normal and the inverse Gaussian distribution.
   scope: population: iETS(M,N,N) with Gamma, log-normal and inverse Gaussian sizes | conditions: scale $s\in[0.05,1]$; smoothing parameter $\alpha\in[0.1,0.6]$; interval length $j\in[2,20]$; states known at the previous observed period | excludes: models with trend or seasonality; ADAM multiplicative ETS
-C10 [formal; principal; support: formal_proof E12; assumes C31, C32; verification unchecked]
-  For a model with an occurrence part and occurrence probability $p_t$, a prediction interval of the demand with coverage $c$ that counts the zeros as covered is an interval of the demand sizes with coverage $(c-(1-p_t))/p_t$, centred on the size forecast $\hat\mu_t$ rather than on the demand forecast $p_t\hat\mu_t$.
-  scope: population: models with an occurrence part (iETS, ADAM) | conditions: prediction interval of the demand that counts zeros as covered; Bernoulli occurrence independent of a continuous demand size
+  extends B4, own earlier work: Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand.
+C10 [formal; principal; support: formal_proof E12; assumes C31, C32; verification agent_checked]
+  For a model with an occurrence part, occurrence probability $p_t$ and positive sizes, a prediction interval $[0,u]$ of the demand with coverage $c>1-p_t$ that counts the zeros as covered has as upper bound $u$ the quantile at level $(c-(1-p_t))/p_t$ of the distribution of the demand size, whose mean, the conditional mean of the size, is the size forecast $\hat\mu_t$, not the demand forecast $p_t\hat\mu_t$.
+  scope: population: models with an occurrence part (iETS, ADAM) | conditions: prediction interval of the demand of the form $[0,u]$ that counts zeros as covered; coverage $c>1-p_t$; Bernoulli occurrence independent of a positive continuous demand size
+  extends B4, own earlier work: Svetunkov and Boylan forecast intermittent demand as the product of the occurrence probability and the forecast demand size.
 C11 [methodological; principal; support: demonstration artefacts A2; uses C1, C4, C6, C7; strength moderate (author)]
   The smooth package for R and Python implements the [[D3:observed-data likelihood]] without the entropy term, the [[D8:SSOE Kalman filter]] for the pure additive models with the normal distribution and in logarithms for the [[D6:ADAM multiplicative ETS]] with the log-normal distribution, the [[D10:normal-drift mixture density]] with moment-equation scales for the other pure multiplicative models, and the corrected log-normal scale, in one C++ routine shared by both languages.
   scope: setting: smooth package for R and Python, master branch at commit 8a5fbbb3
-C12 [formal; supporting; support: formal_proof E8; verification unchecked]
+  supersedes B4, at Appendix B, eq. B.6, own earlier work: Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand.
+C12 [formal; supporting; support: formal_proof E8; verification agent_checked]
   In the [[D6:ADAM multiplicative ETS]], the logarithms of the observation and of the components follow a linear single source of error model with innovation $u_t=\log(1+\epsilon_t)$ and the measurement, transition and persistence of the corresponding additive model, whereas in the [[D7:conventional multiplicative ETS]] the innovation of component $k$ is $\log(1+g_k\epsilon_t)$, which is not proportional to $u_t$.
   scope: population: pure multiplicative ETS in the ADAM and conventional forms
 C30 [descriptive; supporting; assumption (statistical, unchecked)]
@@ -93,15 +102,15 @@ C36 [descriptive; supporting; assumption (theorem_condition, unchecked)]
   In the log-normal ADAM multiplicative ETS, $\log(1+\epsilon_t)\sim\mathcal N(-s/2,s)$, so that $\E(1+\epsilon_t)=1$.
 C37 [descriptive; supporting; assumption (methodological, tested)]
   The [[D9:drift of the states]] of a pure multiplicative model over an interval is approximately normally distributed, with the states known at the previous observed period.
-C14 [formal; secondary; refutation; support: argument W2, cited B4, at eq. 29 and eq. B.6, own earlier work; warrant W2; verification unchecked]
-  With the differential entropy defined as $H=-\E\log f$, the sign of the entropy term in equations 29 and B.6 of Svetunkov and Boylan (2023) should be negative.
+C14 [formal; secondary; refutation; support: formal_proof E15, cited B4, at eq. 29 and eq. B.6, own earlier work; verification agent_checked]
+  The term that the [[D4:entropy-augmented likelihood]] adds for each period with zero demand, the expected log-density of the unobserved size under its own distribution, equals $-H_z$ with the [[D32:differential entropy]] $H_z=-\E\log f_z$, so the entropy enters the objective with a negative sign.
   scope: population: iETS objective of Svetunkov and Boylan (2023)
-  contradicts doi doi:10.1016/j.ijpe.2023.109013, at eq. 29 and eq. B.6 (sign of the entropy term), own earlier work
+  contradicts B4, at eq. 29 and eq. B.6 (sign of the entropy term), own earlier work: Svetunkov and Boylan add the differential entropy of the size for each period with zero demand with a positive sign in their equations 29 and B.6.
 C15 [formal; secondary; support: formal_proof E5, cited B2, cited B3; uses C4; verification agent_checked]
   When every period is observed, the [[D8:SSOE Kalman filter]] keeps $\mathbf P_t=\mathbf 0$, has gain $\mathbf k_t=\mathbf g$ and $f_t=1$, and coincides with the single source of error recursion and the likelihood of the one-step errors.
   scope: population: pure additive single source of error models | data_type: univariate time series | conditions: every period observed
-C16 [formal; secondary; support: formal_proof E7; uses C4; verification unchecked]
-  For ETS(A,N,N) with smoothing parameter $\alpha$ and zero state covariance before an interval of $j$ periods, the gain of the [[D8:SSOE Kalman filter]] at the end of the interval is $$\alpha_j=\frac{(j-1)\alpha^2+\alpha}{(j-1)\alpha^2+1},$$ which equals $\alpha$ for $j=1$ and tends to one as $j$ grows.
+C16 [formal; secondary; support: formal_proof E7; uses C4; verification agent_checked]
+  For ETS(A,N,N) with smoothing parameter $\alpha$ and zero state covariance before an interval of $j$ periods, the gain of the [[D8:SSOE Kalman filter]] at the end of the interval is $$\alpha_j=\frac{(j-1)\alpha^2+\alpha}{(j-1)\alpha^2+1},$$ which equals $\alpha$ for $j=1$ and tends to one as $j$ grows when $\alpha\neq0$.
   scope: population: ETS(A,N,N) | conditions: normally distributed errors; zero state covariance before an interval of $j$ periods
 C17 [formal; secondary; support: formal_proof E11; uses C12; verification agent_checked]
   For pure multiplicative models with the Gamma, log-normal or inverse Gaussian distribution, if $1+e_t=(1+\epsilon_t)D_t$ with $D_t=e^{d_t}$ independent of $\epsilon_t$, $\E(1+\epsilon_t)=1$ and $\Var(1+\epsilon_t)=s$, then $$\E(e_t^2)=(1+s)\E(D_t^2)-2\E(D_t)+1,$$ and for the inverse Gaussian distribution $$\E\big(e_t^2/(1+e_t)\big)=\E(D_t)-2+(1+s)\E(D_t^{-1}).$$
@@ -109,9 +118,9 @@ C17 [formal; secondary; support: formal_proof E11; uses C12; verification agent_
 C18 [descriptive; secondary; support: simulation E21 (E21.T1.r1, E21.T1.r2, E21.T1.r3, E21.T1.r4) artefacts A3, A6; assumes C37; uses C17; limitations L1; strength moderate (author)]
   On errors simulated with the [[D9:drift of the states]] of [[D12:iETS(M,N,N)]] and 1000 observed sizes, the [[D15:fixed-point moment estimator]] of the Gamma and inverse Gaussian scale had a median [[D17:relative bias]] of +0.02% with no [[D18:failed fits]] when the drift order $\E(j-1)\alpha^2s$ was at most 0.02, and failed in 18%, 52% and 71% of fits for drift orders of 0.02 to 0.1, 0.1 to 0.3 and above 0.3.
   scope: population: iETS(M,N,N) with Gamma and inverse Gaussian sizes | conditions: errors simulated with the drift, outside a fitted model; 1000 observed sizes per series; $s\in\{0.05,0.2,0.5,1\}$, $\alpha\in\{0.1,0.3,0.6\}$
-C19 [formal; secondary; support: formal_proof E13; assumes C30; verification unchecked]
-  The point forecast with zero errors of the [[D6:ADAM multiplicative ETS]] is not the conditional mean, because $\E(1+\epsilon_t)^{g_k}<1$ for $0<g_k<1$; for ETS(M,N,N) with Gamma errors of mean one and variance $s$ the conditional mean $h$ steps ahead is $$\hat\mu_{T+h}\left[\frac{\Gamma(1/s+\alpha)s^{\alpha}}{\Gamma(1/s)}\right]^{h-1}.$$
-  scope: population: pure multiplicative ETS in the ADAM form
+C19 [formal; secondary; support: formal_proof E13; assumes C30; verification agent_checked]
+  For ETS(M,N,N) in the [[D6:ADAM multiplicative ETS]] form with $0<\alpha<1$ and non-degenerate errors of mean one, the point forecast with zero errors $h\ge2$ steps ahead is not the conditional mean, because $\E(1+\epsilon_t)^{\alpha}<1$; with Gamma errors of mean one and variance $s$ the conditional mean $h$ steps ahead is $$\hat\mu_{T+h}\left[\frac{\Gamma(1/s+\alpha)s^{\alpha}}{\Gamma(1/s)}\right]^{h-1}.$$
+  scope: population: ETS(M,N,N) in the ADAM form | conditions: $0<\alpha<1$; forecast horizon $h\ge2$
 C20 [descriptive; secondary; support: simulation E22 (E22.R1, E22.R2, E22.R3, E22.R4) artefacts A3, A7; uses C19; strength moderate (author)]
   For [[D20:ETS(M,N,N)]] in the [[D6:ADAM multiplicative ETS]] form with Gamma errors, $s=0.32$ and $\alpha=0.21$, the [[D19:approximate upper bound of the 90% prediction interval]] divided by the point forecast was 2.431 against 1.807 from [[D21:simulated paths]] twelve steps ahead, and 2.616 against 1.638 after six unobserved periods at the end of the sample.
   scope: population: ETS(M,N,N) in the ADAM form | conditions: Gamma errors; $s=0.32$; $\alpha=0.21$; 100 observations
@@ -156,10 +165,11 @@ E1 [formal; foundation Kolmogorov probability axioms] Analytical derivation in t
   E1.3 The joint density of the observed data is the product of these conditional terms (by E1.1, E1.2; prediction-error decomposition)
 E2 [formal; foundation Kolmogorov probability axioms] Analytical derivation in the source draft (artefact A1).
   assumes C31, C32
-  E2.1 $Q(\theta\mid\theta^{(k)})$ contains at each zero the cross-entropy $\int f_z^{(k)}\log f_z\,dz=-H_z(\theta^{(k)})-\KL(f_z^{(k)}\|f_z)$ (by D4; definition of the E-step)
-  E2.2 $$\partial_\theta\int f_z\log f_z^{\theta}dz\Big|_{\theta=\theta^{(k)}}=\partial_\theta\int f_z\,dz=0$$ (by E2.1; differentiation under the integral)
-  E2.3 $\nabla Q(\theta\mid\theta^{(k)})|_{\theta^{(k)}}=\nabla\ell(\theta^{(k)})$, so EM fixed points are stationary points of $\ell$ (by E2.2, B1, C1; EM identity)
-  E2.4 $-\partial_\theta H_z(\theta)\neq0$ in general (e.g. in the scale), adding to the score of $\ell$ (by D4; differentiation)
+  E2.1 $$\nabla_\theta Q(\theta\mid\theta^{(k)})\big|_{\theta=\theta^{(k)}}=\nabla\ell(\theta^{(k)}),$$ with $Q$ the expected complete-data log-likelihood given the observed data at $\theta^{(k)}$ and $\ell$ the [[D3:observed-data likelihood]] (by B1, C1; Fisher's identity (differentiation under the integral))
+  E2.2 A fixed point of EM is a stationary point of $\ell$ (by E2.1; EM identity)
+  E2.3 For normal sizes with fixed location, $$\ell(\sigma^2)=-\frac{T_1}{2}\log\sigma^2-\frac{S}{2\sigma^2}+c,\qquad S=\sum_{O_t=1}e_t^2,$$ stationary at $\sigma^2=S/T_1$ (by C1, D3; differentiation)
+  E2.4 Each zero adds $\int f_z\log f_z\,dz=-\frac12\log(2\pi e\sigma^2)$, whose gradient in $\sigma^2$ is $-1/(2\sigma^2)\neq0$; so the [[D4:entropy-augmented likelihood]] is $$\ell_H(\sigma^2)=\ell(\sigma^2)-\frac{T_0}{2}\log(2\pi e\sigma^2),$$ stationary at $\sigma^2=S/T$ with $T=T_1+T_0$ (by D4, D32, E2.3; normal entropy and differentiation)
+  E2.5 $S/T\neq S/T_1$ whenever $T_0>0$ and $S>0$, so the stationary points differ (by E2.3, E2.4; comparison)
 E3 [formal; foundation Kolmogorov probability axioms] Analytical derivation in the source draft (artefact A1).
   E3.1 $H_z=\frac12\log(2\pi e\sigma^2)$ for the normal distribution (by D4; definition)
   E3.2 $$\frac{\partial\ell_H}{\partial\sigma^2}=-\frac{T_1}{2\sigma^2}+\frac{\sum e_t^2}{2\sigma^4}-\frac{T_0}{2\sigma^2},$$ zero at $\sigma^2=\sum e_t^2/T$ (by E3.1; differentiation)
@@ -176,10 +186,12 @@ E5 [formal; foundation Kolmogorov probability axioms] Analytical derivation in t
   E5.3 By induction from $\mathbf P_1=\mathbf 0$ the filter is the SSOE recursion (by E5.2; induction)
 E6 [formal; foundation Kolmogorov probability axioms] Analytical derivation in the source draft (artefact A1).
   E6.1 After $j-1$ unobserved periods from $\mathbf P=\mathbf 0$, $f=1+\sum_{i<j}c_i^2$ with $c_i=\mathbf w'\mathbf F^{i-1}\mathbf g$ (by D8; iteration of the propagation)
-  E6.2 $f_t>1$ when $c_1\neq0$, and $\mathbf k_t\neq\mathbf g$ while $\mathbf P_t\neq\mathbf 0$ (by E6.1; substitution)
-  E6.3 The zero-error recursion uses variance $\sigma^2$ and gain $\mathbf g$, so its objective differs from the exact likelihood (by E6.2, D5, C4; comparison)
+  E6.2 $f_t>1$ when $c_i\neq0$ for some $i<j$ (by E6.1; substitution)
+  E6.3 The zero-error recursion uses variance $\sigma^2$ at every observed period, so its objective differs from the exact likelihood (by E6.2, D5, C4; comparison)
+  E6.4 Both predict the first observed period after the first interval from the states propagated by $\mathbf F$ with zero errors, so its prediction error $e_t$ is the same in both (by D5, D8; zero mean of the errors in the interval)
+  E6.5 For given other parameters the maximiser in $\sigma^2$ is $\frac{1}{T_1}\sum e_t^2$ for the zero-error recursion and $\frac{1}{T_1}\sum v_t^2/f_t$ for the exact likelihood, which differ unless the data satisfy $\sum e_t^2=\sum v_t^2/f_t$, a term with $f_t>1$ and $v_t=e_t$ being present (by E6.2, E6.4, C4; differentiation in $\sigma^2$)
 E7 [formal; foundation Kolmogorov probability axioms] Analytical derivation in the source draft (artefact A1).
-  E7.1 $P=(j-1)\alpha^2$, $f=(j-1)\alpha^2+1$ after $j-1$ unobserved periods (by D8; substitution $w=F=1$, $g=\alpha$)
+  E7.1 $P=(j-1)\alpha^2$, $f=(j-1)\alpha^2+1$ after $j-1$ unobserved periods (by C4, D8; substitution $w=F=1$, $g=\alpha$)
   E7.2 $k=(P+\alpha)/f$ (by E7.1, D8; substitution)
 E8 [formal; foundation Kolmogorov probability axioms] Analytical derivation in the source draft (artefact A1).
   E8.1 $\log z_t=\log l_{t-1}+\phi\log b_{t-1}+\log s_{t-m}+u_t$ (by D6; logarithm)
@@ -188,7 +200,7 @@ E8 [formal; foundation Kolmogorov probability axioms] Analytical derivation in t
 E9 [formal; foundation Kolmogorov probability axioms] Analytical derivation in the source draft (artefact A1).
   assumes C30, C33, C34, C36
   E9.1 $\log z_t$ follows a linear Gaussian SSOE model with known error mean $-s/2$ (by C12, C36; linearity in logarithms)
-  E9.2 The filter of the linear Gaussian model with the Jacobian $-\sum\log z_t$ gives the exact likelihood (by E9.1, C4; change of variables)
+  E9.2 The filter of the linear Gaussian model with the Jacobian $-\sum\log z_t$ gives the exact likelihood (by C33, C34, C4, E9.1; change of variables)
   E9.3 Predictions are linear in $-s/2$ with gain-only coefficients, so $v_t(s)=v_t^0+sb_t$ (by E9.2; linearity)
   E9.4 The score in $s$ times $2s^2$ gives $(\sum b_t^2/f_t)s^2+T_1s-\sum(v_t^0)^2/f_t=0$ (by E9.3; differentiation)
 E10 [formal; foundation Kolmogorov probability axioms] Analytical derivation in the source draft (artefact A1).
@@ -201,17 +213,24 @@ E11 [formal; foundation Kolmogorov probability axioms] Analytical derivation in 
   E11.2 Independence of $\epsilon_t$ and $D_t$ with $\E(1+\epsilon)^2=1+s$ and, for the inverse Gaussian, $\E(1+\epsilon)^{-1}=1+s$ (by E11.1; independence and moments)
 E12 [formal; foundation Kolmogorov probability axioms] Analytical derivation in the source draft (artefact A1).
   assumes C31, C32
-  E12.1 $P(y_t\in[0,u])=(1-p_t)+p_tF_z(u)$ when zeros count as covered (by C31, C32; law of total probability)
-  E12.2 Setting it to $c$ gives $F_z$ coverage $(c-(1-p_t))/p_t$, a quantile of the sizes around $\hat\mu_t$ (by E12.1; algebra)
+  E12.1 $$P(0\le y_t\le u)=(1-p_t)+p_tF_z(u)$$ for positive sizes and occurrence independent of the size (by C31, C32; law of total probability)
+  E12.2 Setting it to $c$ with $c>1-p_t$ gives $F_z(u)=(c-(1-p_t))/p_t\in(0,1]$, so $u$ is the quantile of the size at that level (by E12.1; algebra)
+  E12.3 The size has mean $\hat\mu_t$, the demand $\E(o_tz_t)=p_t\hat\mu_t$ (by C31; independence)
 E13 [formal; foundation Kolmogorov probability axioms] Analytical derivation in the source draft (artefact A1).
   assumes C30
-  E13.1 $x\mapsto x^{g}$ is concave for $0<g<1$, so $\E(1+\epsilon)^{g}<(\E(1+\epsilon))^{g}=1$ (by D6; Jensen's inequality)
-  E13.2 For ETS(M,N,N), $\E(z_{T+h}\mid Y_T)=\hat\mu_{T+h}[\E(1+\epsilon)^{\alpha}]^{h-1}$ by independence of the errors (by E13.1, C30; independence)
-  E13.3 For Gamma with mean one and variance $s$, $\E(1+\epsilon)^{\alpha}=\Gamma(1/s+\alpha)s^{\alpha}/\Gamma(1/s)$ (by E13.2; Gamma moments)
+  E13.1 $x\mapsto x^{\alpha}$ is strictly concave for $0<\alpha<1$, so for non-degenerate $1+\epsilon>0$ with $\E(1+\epsilon)=1$, $\E(1+\epsilon)^{\alpha}<(\E(1+\epsilon))^{\alpha}=1$ (by D6; Jensen's inequality)
+  E13.2 In the ADAM form $l_t=l_{t-1}(1+\epsilon_t)^{\alpha}$ and $z_t=l_{t-1}(1+\epsilon_t)$, so $$\E(z_{T+h}\mid Y_T)=l_T\,[\E(1+\epsilon)^{\alpha}]^{h-1}\,\E(1+\epsilon)=\hat\mu_{T+h}[\E(1+\epsilon)^{\alpha}]^{h-1},$$ with $\hat\mu_{T+h}=l_T$ the forecast with zero errors (by D6, C30; independence of the errors)
+  E13.3 For $h\ge2$ the factor is below one, so the conditional mean is below the forecast with zero errors (by E13.1, E13.2; substitution)
+  E13.4 For $1+\epsilon$ Gamma with shape $1/s$ and scale $s$ (mean one, variance $s$), $\E(1+\epsilon)^{\alpha}=\Gamma(1/s+\alpha)s^{\alpha}/\Gamma(1/s)$ (by E13.2; Gamma moments)
 E14 [formal; foundation Kolmogorov probability axioms] Analytical derivation in the source draft (artefact A1).
   E14.1 An unobserved period adds the rank-one term $\mathbf g\mathbf g'$ (by D8; propagation)
   E14.2 An observed period removes the direction it reveals while adding the new error, so the rank does not increase (by D8; update)
   E14.3 With $\mathbf M=[\mathbf U_t^F,\mathbf g]$ and $\mathbf M(\mathbf a,1)'=f_t\mathbf k_t$, a Householder reflection gives $$\mathbf U_{t+1}=\mathbf U_t^F-\frac{(f_t\mathbf k_t+\sqrt{f_t}\mathbf g)\mathbf a'}{f_t+\sqrt{f_t}}$$ (by E14.2; Householder reflection)
+E15 [formal; foundation Lebesgue integration] Derivation of the sign of the term iETS adds for each period with zero demand (source draft, artefact A1, the remark after the corollary on the shrunk scale).
+  E15.1 $$H_z = -\E\log f_z = -\int f_z(z)\log f_z(z)\,dz$$ (by D32; definition of the differential entropy)
+  E15.2 $$\int f_z(z)\log f_z(z)\,dz = -H_z$$ (by E15.1; multiplying by $-1$)
+  E15.3 The term added for each period with zero demand is the expected log-density of the unobserved size under its own distribution, $\int f_z\log f_z\,dz$ (by D4; definition of the objective)
+  E15.4 $$\int f_z\log f_z\,dz = -H_z,$$ so the entropy enters the objective with a negative sign (by E15.2, E15.3; substitution)
 E20 [simulation; data_origin primary; runs 1] Comparison, for iETS(M,N,N) under the ADAM and conventional multiplicative ETS forms, of the normal-drift mixture density (drift moments by 32-node Gauss-Legendre, mixture by 16-node Gauss-Hermite) and of the one-step density against the exact density of the size after an interval, computed on a grid of step 0.001 in log z by FFT convolution with tails cut at 1e-12, by the largest Kullback-Leibler divergence per observation over $s$ from 0.05 to 1 in steps of 0.05, $\alpha$ from 0.1 to 0.6 in steps of 0.05 and $j$ from 2 to 20; a 164-cell refinement run halved the step and cut tails at 1e-14. The run recorded smooth commit f9d062ee with the claimset scripts not yet committed; the scripts are archived at commit f1de3ea1.
   setup: studied D10, D11; cases D12, D6, D7; procedure D13; lens D14
   E20.T1 Largest Kullback-Leibler divergence per observation from the exact density of the size after an interval, of the normal-drift mixture density and of the one-step density, for iETS(M,N,N) with Gamma, log-normal and inverse Gaussian sizes in the conventional and the ADAM form {model: iETS(M,N,N)}
@@ -268,7 +287,6 @@ E24 [simulation; data_origin primary; runs 1] Kullback-Leibler divergence, in bo
 
 WARRANTS
 W1 [deductive; premises C2] With a dynamic scale model, the scale at each period with zero demand is a free function of the parameters and enters the entropy-augmented likelihood only through the term $-H_z$; for the normal distribution $-H_z=-\frac12\log(2\pi e\sigma^2)$ increases without bound as $\sigma\to0$, and for the Gamma distribution the entropy decreases in the scale for large values, so the objective has no finite maximum.
-W2 [deductive] The expected log-density of an unobserved size is $\int f_z\log f_z\,dz$, which equals $-H_z$ when the differential entropy is $H_z=-\E\log f_z$; the term added for each zero therefore enters the objective with a negative sign.
 W3 [deductive; premises C15] The SSOE Kalman filter coincides with the single source of error recursion whenever its covariance is zero; the covariance starts at zero after backcasting and becomes non-zero only at an unobserved period, so on series without unobserved periods the last forward pass performs the same operations as the recursion.
 
 LIMITATIONS
@@ -285,9 +303,14 @@ A6 [table] Mean, bias, Monte Carlo standard error, relative bias and number of f
 A7 [table] Upper bound of the 90% prediction interval of ETS(M,N,N) divided by the point forecast, approximate against simulated, for Gamma, inverse Gaussian and log-normal errors under the ADAM and conventional forms, twelve steps ahead and after six unobserved periods at the end of the sample.
 A8 [table] Median and interquartile range of run times of the low-rank and full-covariance SSOE Kalman filter for ADAM ETS(A,N,A) with lags 24 and 168 on 1344 hourly observations with 1 to 48 missing values, with speed-ups and the largest differences in log-likelihood and fitted values.
 A9 [table] Kullback-Leibler divergence, in both directions, between the exact convolution of Laplace, S and Generalised Normal errors with normal state uncertainty and its family-scaled, one-step and Gauss-Hermite approximations, for variance ratios $f_t$ from 1.01 to 100.
+A10 [proof] Report of the independent proof check by the contributor P6 (first round, 2026-11-11): for C1, C2, C5, C6, C8, C10, C12, C14, C16 and C19, the re-derivation, the numerical spot checks, the outcome and the gaps found; with proof-checks.json, proof-checks-2.md and proof-checks-2.json (the second round, on C2, C5, C10, C14 and C19 as corrected after the first) in the same folder.
+A11 [code] The numerical spot checks of the independent proof check (chk1.py to chk4.py in the same folder; Python with numpy).
 
 REFERENCES
 B1 10.1111/j.2517-6161.1977.tb01600.x (doi)
 B2 10.1080/01621459.1997.10473684 (doi)
 B3 10.1111/j.2517-6161.1985.tb01355.x (doi)
 B4 10.1016/j.ijpe.2023.109013 (doi)
+B5 10.1201/9781003452652 (doi)
+B6 10.1017/cbo9781107049994 (doi)
+B7 10.1093/acprof:oso/9780199641178.001.0001 (doi)

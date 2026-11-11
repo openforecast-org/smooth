@@ -1,0 +1,121 @@
+[
+ {
+  "claim": "C1",
+  "evidence": "E1",
+  "outcome": "confirmed",
+  "extent": "full",
+  "notes": "Re-derived the prediction-error factorisation: P(y=0|past)=1-p by independence and continuity, and y>0 has density p*f, so the log-likelihood separates into size and occurrence parts. Checked numerically on ETS(A,N,N) with two unobserved periods: the integral of the complete-data density over the unobserved sizes equals the Kalman predictive-density sum to 2e-13.",
+  "gaps": [
+   "Positivity of sizes (z>0) is needed in E1.1/E1.2 but only P(z=0)=0 is assumed.",
+   "C31 gives contemporaneous independence only; the factorisation needs the occurrence process (p_t) to carry no information on sizes.",
+   "E1 does not show the sum over t, the disjoint parameter sets, or the equality with D3."
+  ]
+ },
+ {
+  "claim": "C2",
+  "evidence": "E2",
+  "outcome": "confirmed",
+  "extent": "partial",
+  "notes": "Verified the cross-entropy/KL identity, that the cross-entropy has zero gradient at the current estimate, and that -dH/dtheta is non-zero. For normal sizes with fixed location the entropy-augmented maximiser is S/T=1.991 against the EM fixed point S/T1=3.318. The exact form of the E-step as a cross-entropy in the state-dependent model was not established.",
+  "gaps": [
+   "E2 does not conclude that the stationary points differ; the manuscript's normal-scale corollary should be added.",
+   "In the dynamic model the posterior of an unobserved size given the data is not f_z at theta^(k); the cross-entropy form is exact only for conditionally independent sizes. ell_H also uses zero-error densities, a second source of difference.",
+   "E2.1 cites D4 as the definition of the E-step; ell is undefined in E2.3."
+  ]
+ },
+ {
+  "claim": "C5",
+  "evidence": "E6",
+  "outcome": "confirmed",
+  "extent": "partial",
+  "notes": "Re-derived P, f and the gain: f=1+sum c_i^2>1 when c_1!=0 and the zero-error recursion uses sigma^2 and g, so the two objectives differ. Simulating ETS(A,N,N) (true alpha 0.3, T=20000, half the periods observed) the exact MLE averaged 0.301 while the zero-error maximiser averaged 0.397 (0.475 with 30% observed). E6 itself proves only that the objectives differ, not that the maximisers do.",
+  "gaps": [
+   "Objectives differing does not imply maximisers differ; an expected-score argument is missing.",
+   "g!=0 is not enough: F=I, w=(1,0)', g=(0,b)' has c_i=0 and the recursions coincide; c_i!=0 for some i<j is needed.",
+   "E6.2 k_t!=g is false in general (ETS(A,N,N) with alpha=1 gives k=1=g for any P); f_t>1 still holds."
+  ]
+ },
+ {
+  "claim": "C6",
+  "evidence": "E9",
+  "outcome": "confirmed",
+  "extent": "full",
+  "notes": "Derived the filter on log z with mean shift -g s/2 and the Jacobian, and the score in s; the cross terms cancel to give (sum b^2/f)s^2+T1 s-sum v0^2/f=0. Numerically the filter log-likelihood equals the brute-force integral over two unobserved log-sizes (-18.275599457737) and the positive roots (0.29147, 0.25190) equal the grid maxima of the filter likelihood.",
+  "gaps": [
+   "Claim says the mean -s/2 is added to the propagation; the state needs -g s/2.",
+   "E9.3/E9.4 omit the form of b_t, the cancellation of cross terms and uniqueness of the positive root.",
+   "E9 does not cite C33 and C34, which it uses."
+  ]
+ },
+ {
+  "claim": "C8",
+  "evidence": "E10",
+  "outcome": "confirmed",
+  "extent": "full",
+  "notes": "With f_t=1 and b_t=1/2 the C6 equation is s^2+4s-4m=0, root 2(sqrt(1+m)-1); the ADAM-type estimator is the smaller root of s^2-4s+4m=0, real only for m<=1 and larger than the MLE for every m in (0,1). At m=0.5625 the values are 0.677 and 0.5 (ratio 1.354); a numerical likelihood maximisation on simulated log-normal errors agreed with the formula.",
+  "gaps": [
+   "E10.1 cites C15, not in C8's depends_on.",
+   "Undefined for m>1 and overestimation for every m are not stated in E10.",
+   "That ADAM's code uses this estimator is not supported in the claimset."
+  ]
+ },
+ {
+  "claim": "C10",
+  "evidence": "E12",
+  "outcome": "confirmed",
+  "extent": "partial",
+  "notes": "P(0<=y<=u)=(1-p)+pF_z(u) for positive sizes, so coverage c requires F_z(u)=(c-(1-p))/p; Monte Carlo with p=0.4, c=0.9 gave coverage 0.8997 and size coverage 0.7500. The phrase 'centred on the size forecast' is an interpretation not derived in E12.",
+  "gaps": [
+   "Needs c>1-p_t.",
+   "Needs z>=0 and an interval of the form [0,u].",
+   "'Centred' should read 'bounds are quantiles of the size distribution'."
+  ]
+ },
+ {
+  "claim": "C12",
+  "evidence": "E8",
+  "outcome": "confirmed",
+  "extent": "full",
+  "notes": "Taking logs of D6 gives the additive ETS(A,Ad,A) recursion with innovation u_t=log(1+eps); in D7 the innovation is log(1+g eps), and log(1+g eps)/(g log(1+eps)) is not constant for 0<g<1. Simulated ETS(M,Md,M) matched the log-linear recursion to 2e-15 and the ratio took values 0.78 to 1.26.",
+  "gaps": [
+   "E8 omits the seasonal update, the identification of w, F, g with the additive model, and the non-proportionality step.",
+   "True only for 0<g_k<1; positivity of 1+g_k eps is needed in the conventional form."
+  ]
+ },
+ {
+  "claim": "C14",
+  "evidence": "E15",
+  "outcome": "confirmed",
+  "extent": "partial",
+  "notes": "Verified that the integral of f log f equals -H (Gamma and Normal, numerically to 1e-8), so under the stated premise the term enters with a negative sign. What Svetunkov and Boylan (2023) print was not checked, and E15.3's premise cites D4, which already defines the objective with minus H.",
+  "gaps": [
+   "Circularity: E15.3 cites D4, whose sign is the conclusion.",
+   "D4 attributes the minus-entropy form to eq. B.6 while C14 says that paper has the other sign.",
+   "The premise that the added term is the expected log-density is motivation (E-step analogy), not derived; C2 shows it is not the EM term."
+  ]
+ },
+ {
+  "claim": "C16",
+  "evidence": "E7",
+  "outcome": "confirmed",
+  "extent": "full",
+  "notes": "D8 with w=F=1, g=alpha and P=0 gives P=(j-1)alpha^2, f=P+1, k=(P+alpha)/f, the stated formula; j=1 gives alpha and the limit is 1. The recursion matched the formula to 1e-14 for alpha in {0.1,0.3,0.7}, j=1..7, and a Monte Carlo regression gave 0.4487 against 0.4488.",
+  "gaps": [
+   "E7.1 does not state P=0 at the start nor the growth by alpha^2 per period.",
+   "The limit one needs alpha!=0.",
+   "E7 omits C4, listed in depends_on."
+  ]
+ },
+ {
+  "claim": "C19",
+  "evidence": "E13",
+  "outcome": "confirmed",
+  "extent": "partial",
+  "notes": "Re-derived E z_{T+h}=mu_hat*[E(1+eps)^alpha]^(h-1) for ETS(M,N,N) and the Gamma moment s^alpha Gamma(1/s+alpha)/Gamma(1/s); with s=0.32 and alpha=0.21 the value is 0.97309 and simulated conditional means for h=2,5,12 matched powers of it within Monte Carlo error. The general sentence for the whole family is not proved by E13, and it fails at h=1.",
+  "gaps": [
+   "Holds for h>=2 and non-degenerate errors; at h=1 the forecast is the mean.",
+   "With trend or seasonal components exponents add and can exceed 1, so 'E(1+eps)^{g_k}<1' does not prove the general statement.",
+   "E13.2 uses E(1+eps)=1 unstated; E13.3 does not depend on E13.2."
+  ]
+ }
+]

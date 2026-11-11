@@ -45,7 +45,9 @@
     ],
     "autonomy": "human_supervised",
     "contribution_record": "complete",
-    "origin": "native"
+    "origin": "native",
+    "id": "entrylib:2026.000003",
+    "correction_reason": "The proofs of C1, C2, C5, C6, C8, C10, C12, C14, C16 and C19 were checked by an independent agent on a second model (contributor P6; reports in artefact A10). Its first round found five proofs that showed less than their claims stated; these claims are corrected to what is proved: C2 completes its argument with the normal-variance case, C5 states its condition as a nonzero $\\mathbf w'\\mathbf F^{i-1}\\mathbf g$ and its conclusion for the objective and the variance, C10 states the conditions of the interval and that its bound is a quantile of the size distribution, C14 states the derivation of the sign (the sign printed by Svetunkov and Boylan, 2023, is in its relation), and C19 is stated for ETS(M,N,N) at horizons of two or more. The second round confirmed all ten in full. C14 rests on a formal proof (new evidence E15, definition D32) instead of an argument; D4 defines the term of each zero without presupposing its sign. Smaller precisions: C1 (positive sizes), C6 (the error mean enters the propagation through g), C8 depends on C15, C16 (alpha nonzero). Relations name references (B5-B7 added), and C1, C3, C6, C7, C9, C10 and C11 relate to the earlier work they extend or supersede. No claim ID changed."
   },
   "contributors": [
     {
@@ -212,6 +214,85 @@
       "system": {
         "name": "Claude Code"
       }
+    },
+    {
+      "id": "P6",
+      "type": "agent",
+      "name": "Claude Code (independent proof checker, second model)",
+      "positions": [
+        "contributor"
+      ],
+      "models": [
+        {
+          "model": "M2",
+          "role": "sole"
+        }
+      ],
+      "credit_roles": [
+        "validation"
+      ],
+      "ai_tasks": [
+        {
+          "task": "review",
+          "extent": "full"
+        }
+      ],
+      "tools": [
+        "code_execution",
+        "file_access"
+      ],
+      "record_source": "self_reported",
+      "run_period": {
+        "start": "2026-11-11",
+        "end": "2026-11-11"
+      },
+      "system": {
+        "name": "Claude Code"
+      }
+    },
+    {
+      "id": "P7",
+      "type": "agent",
+      "name": "Claude Code (correction agent)",
+      "positions": [
+        "author"
+      ],
+      "models": [
+        {
+          "model": "M1",
+          "role": "sole"
+        }
+      ],
+      "credit_roles": [
+        "formal_analysis",
+        "writing_review_editing"
+      ],
+      "ai_tasks": [
+        {
+          "task": "analysis",
+          "extent": "substantial"
+        },
+        {
+          "task": "writing",
+          "extent": "full"
+        },
+        {
+          "task": "json_preparation",
+          "extent": "full"
+        }
+      ],
+      "tools": [
+        "code_execution",
+        "file_access"
+      ],
+      "record_source": "self_reported",
+      "run_period": {
+        "start": "2026-11-11",
+        "end": "2026-11-11"
+      },
+      "system": {
+        "name": "Claude Code"
+      }
     }
   ],
   "models": [
@@ -223,6 +304,15 @@
       "identifier": "claude-opus-5-5",
       "weights": "api_only",
       "accessed": "2026-10-15"
+    },
+    {
+      "id": "M2",
+      "provider": "Anthropic",
+      "name": "Claude Sonnet",
+      "version": "5.5",
+      "identifier": "claude-sonnet-5-5",
+      "weights": "api_only",
+      "accessed": "2026-11-11"
     }
   ],
   "definitions": [
@@ -461,7 +551,7 @@
         "C31",
         "C32"
       ],
-      "verification": "unchecked",
+      "verification": "agent_checked",
       "provenance": "author_stated",
       "relations": [
         {
@@ -476,6 +566,14 @@
           "locator": "Appendix B, eq. B.6",
           "self": true,
           "note": "Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand."
+        }
+      ],
+      "checks": [
+        {
+          "by": "P6",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "Re-derived the prediction-error factorisation: P(y=0|past)=1-p by independence and continuity, and y>0 has density p*f, so the log-likelihood separates into size and occurrence parts. Checked numerically on ETS(A,N,N) with two unobserved periods: the integral of the complete-data density over the unobserved sizes equals the Kalman predictive-density sum to 2e-13. (first round; report A10, scripts A11.)"
         }
       ]
     },
@@ -517,7 +615,7 @@
       "depends_on": [
         "C1"
       ],
-      "verification": "unchecked",
+      "verification": "agent_checked",
       "provenance": "author_stated",
       "relations": [
         {
@@ -526,6 +624,14 @@
           "locator": "Appendix B, eq. B.6 (likelihood with the differential entropy of the unobserved sizes, derived by analogy with the EM algorithm)",
           "self": true,
           "note": "Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand."
+        }
+      ],
+      "checks": [
+        {
+          "by": "P6",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "Re-derived Fisher's identity (gradient of Q at the current estimate equals the observed-data score, valid at every iterate and so at EM fixed points) and the normal-variance example: the observed-data likelihood is stationary at S/T1 and the entropy-augmented one at S/T, different when T0>0 and S>0. Numerically with T1=60, T0=40 the maximisers are 3.318 and 1.991, and the cross-entropy gradient at the current estimate is 0 while that of -H is -0.385. (second round, on the claim as corrected; report A10, scripts A11.)"
         }
       ]
     },
@@ -688,7 +794,7 @@
       "depends_on": [
         "C4"
       ],
-      "verification": "unchecked",
+      "verification": "agent_checked",
       "provenance": "author_stated",
       "relations": [
         {
@@ -697,6 +803,14 @@
           "locator": "Appendix C (estimation with zero errors at the unobserved periods)",
           "self": true,
           "note": "Svetunkov and Boylan define iETS, intermittent demand as the product of a Bernoulli occurrence and a demand size modelled by exponential smoothing, and estimate it with a likelihood that adds the differential entropy of the size for each period with zero demand."
+        }
+      ],
+      "checks": [
+        {
+          "by": "P6",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "Re-derived f=1+sum c_i^2>1 for some c_i!=0 and that the zero-error likelihood uses sigma^2 where the exact one uses sigma^2 f_t, so the likelihoods differ; the variance maximisers (1/T1)sum e^2 and (1/T1)sum v^2/f differ because their difference is positive when the first observed period after a gap is the last observation. In an ETS(A,N,N) check the two sums were 7.4975 and 6.7015, and the difference was positive in all 2000 random samples. (second round, on the claim as corrected; report A10, scripts A11.)"
         }
       ]
     },
@@ -739,7 +853,7 @@
         "C4",
         "C12"
       ],
-      "verification": "unchecked",
+      "verification": "agent_checked",
       "provenance": "author_stated",
       "relations": [
         {
@@ -747,6 +861,14 @@
           "reference": "B5",
           "self": true,
           "note": "The ADAM monograph defines the multiplicative ETS of ADAM with the log-normal, Gamma and inverse Gaussian distributions and estimates it by likelihood with every period observed."
+        }
+      ],
+      "checks": [
+        {
+          "by": "P6",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "Derived the filter on log z with mean shift -g s/2 and the Jacobian, and the score in s; the cross terms cancel to give (sum b^2/f)s^2+T1 s-sum v0^2/f=0. Numerically the filter log-likelihood equals the brute-force integral over two unobserved log-sizes (-18.275599457737) and the positive roots (0.29147, 0.25190) equal the grid maxima of the filter likelihood. (first round; report A10, scripts A11.)"
         }
       ]
     },
@@ -840,7 +962,7 @@
         "C15",
         "C7"
       ],
-      "verification": "unchecked",
+      "verification": "agent_checked",
       "provenance": "author_stated",
       "relations": [
         {
@@ -849,6 +971,14 @@
           "locator": "estimator of the scale of the log-normal distribution",
           "self": true,
           "note": "The ADAM monograph defines the multiplicative ETS of ADAM with the log-normal, Gamma and inverse Gaussian distributions and estimates it by likelihood with every period observed."
+        }
+      ],
+      "checks": [
+        {
+          "by": "P6",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "With f_t=1 and b_t=1/2 the C6 equation is s^2+4s-4m=0, root 2(sqrt(1+m)-1); the ADAM-type estimator is the smaller root of s^2-4s+4m=0, real only for m<=1 and larger than the MLE for every m in (0,1). At m=0.5625 the values are 0.677 and 0.5 (ratio 1.354); a numerical likelihood maximisation on simulated log-normal errors agreed with the formula. (first round; report A10, scripts A11.)"
         }
       ]
     },
@@ -921,7 +1051,7 @@
     },
     {
       "id": "C10",
-      "statement": "For a model with an occurrence part, occurrence probability $p_t$ and positive sizes, a prediction interval $[0,u]$ of the demand with coverage $c>1-p_t$ that counts the zeros as covered has as upper bound $u$ the quantile at level $(c-(1-p_t))/p_t$ of the distribution of the demand size, whose mean is the size forecast $\\hat\\mu_t$, not the demand forecast $p_t\\hat\\mu_t$.",
+      "statement": "For a model with an occurrence part, occurrence probability $p_t$ and positive sizes, a prediction interval $[0,u]$ of the demand with coverage $c>1-p_t$ that counts the zeros as covered has as upper bound $u$ the quantile at level $(c-(1-p_t))/p_t$ of the distribution of the demand size, whose mean, the conditional mean of the size, is the size forecast $\\hat\\mu_t$, not the demand forecast $p_t\\hat\\mu_t$.",
       "about": {
         "subject": "a prediction interval of the demand that counts zeros as covered",
         "relation": "is an interval of the demand sizes centred on",
@@ -952,7 +1082,7 @@
         "C31",
         "C32"
       ],
-      "verification": "unchecked",
+      "verification": "agent_checked",
       "provenance": "author_stated",
       "relations": [
         {
@@ -960,6 +1090,14 @@
           "reference": "B4",
           "self": true,
           "note": "Svetunkov and Boylan forecast intermittent demand as the product of the occurrence probability and the forecast demand size."
+        }
+      ],
+      "checks": [
+        {
+          "by": "P6",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "P(0<=y<=u)=(1-p)+pF_z(u) for positive sizes, so coverage c>1-p needs F_z(u)=(c-(1-p))/p, a quantile of the size distribution whose mean is mu_hat while E(y)=p mu_hat. Monte Carlo with p=0.4, c=0.9 gave coverage 0.8997 and size level 0.7500. (second round, on the claim as corrected; report A10, scripts A11.)"
         }
       ]
     },
@@ -1030,11 +1168,19 @@
           "evidence": "E8"
         }
       ],
-      "verification": "unchecked",
+      "verification": "agent_checked",
       "provenance": "author_stated",
       "scope": {
         "population": "pure multiplicative ETS in the ADAM and conventional forms"
-      }
+      },
+      "checks": [
+        {
+          "by": "P6",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "Taking logs of D6 gives the additive ETS(A,Ad,A) recursion with innovation u_t=log(1+eps); in D7 the innovation is log(1+g eps), and log(1+g eps)/(g log(1+eps)) is not constant for 0<g<1. Simulated ETS(M,Md,M) matched the log-linear recursion to 2e-15 and the ratio took values 0.78 to 1.26. (first round; report A10, scripts A11.)"
+        }
+      ]
     },
     {
       "id": "C13",
@@ -1098,7 +1244,7 @@
         }
       ],
       "provenance": "author_stated",
-      "verification": "unchecked",
+      "verification": "agent_checked",
       "relations": [
         {
           "type": "contradicts",
@@ -1110,7 +1256,15 @@
       ],
       "scope": {
         "population": "iETS objective of Svetunkov and Boylan (2023)"
-      }
+      },
+      "checks": [
+        {
+          "by": "P6",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "Verified that the integral of f log f equals -H_z (Gamma and Normal, to 1e-8), so the term that D4 now defines equals -H_z and the entropy enters with a negative sign. The earlier circularity is gone because D4 no longer fixes the sign. (second round, on the claim as corrected; report A10, scripts A11.)"
+        }
+      ]
     },
     {
       "id": "C15",
@@ -1194,8 +1348,16 @@
       "depends_on": [
         "C4"
       ],
-      "verification": "unchecked",
-      "provenance": "author_stated"
+      "verification": "agent_checked",
+      "provenance": "author_stated",
+      "checks": [
+        {
+          "by": "P6",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "D8 with w=F=1, g=alpha and P=0 gives P=(j-1)alpha^2, f=P+1, k=(P+alpha)/f, the stated formula; j=1 gives alpha and the limit is 1. The recursion matched the formula to 1e-14 for alpha in {0.1,0.3,0.7}, j=1..7, and a Monte Carlo regression gave 0.4487 against 0.4488. (first round; report A10, scripts A11.)"
+        }
+      ]
     },
     {
       "id": "C17",
@@ -1301,7 +1463,7 @@
     },
     {
       "id": "C19",
-      "statement": "For [[D20:ETS(M,N,N)]] in the [[D6:ADAM multiplicative ETS]] form with $0<\\alpha<1$ and non-degenerate errors of mean one, the point forecast with zero errors $h\\ge2$ steps ahead is not the conditional mean, because $\\E(1+\\epsilon_t)^{\\alpha}<1$; with Gamma errors of mean one and variance $s$ the conditional mean $h$ steps ahead is $$\\hat\\mu_{T+h}\\left[\\frac{\\Gamma(1/s+\\alpha)s^{\\alpha}}{\\Gamma(1/s)}\\right]^{h-1}.$$",
+      "statement": "For ETS(M,N,N) in the [[D6:ADAM multiplicative ETS]] form with $0<\\alpha<1$ and non-degenerate errors of mean one, the point forecast with zero errors $h\\ge2$ steps ahead is not the conditional mean, because $\\E(1+\\epsilon_t)^{\\alpha}<1$; with Gamma errors of mean one and variance $s$ the conditional mean $h$ steps ahead is $$\\hat\\mu_{T+h}\\left[\\frac{\\Gamma(1/s+\\alpha)s^{\\alpha}}{\\Gamma(1/s)}\\right]^{h-1}.$$",
       "about": {
         "subject": "D6",
         "relation": "has a point forecast with zero errors below",
@@ -1330,8 +1492,16 @@
       "assumptions": [
         "C30"
       ],
-      "verification": "unchecked",
-      "provenance": "author_stated"
+      "verification": "agent_checked",
+      "provenance": "author_stated",
+      "checks": [
+        {
+          "by": "P6",
+          "outcome": "confirmed",
+          "extent": "full",
+          "notes": "Re-derived E(z_{T+h}|Y_T)=mu_hat [E(1+eps)^alpha]^(h-1) for ETS(M,N,N), the strict Jensen inequality for 0<alpha<1 and non-degenerate errors, and the Gamma moment s^alpha Gamma(1/s+alpha)/Gamma(1/s). With s=0.32, alpha=0.21 the factor is 0.97309 and simulated conditional means for h=2,5,12 matched its powers within Monte Carlo error. (second round, on the claim as corrected; report A10, scripts A11.)"
+        }
+      ]
     },
     {
       "id": "C20",
@@ -2222,7 +2392,7 @@
         },
         {
           "id": "E6.4",
-          "statement": "Both predict the first observed period after an interval from the states propagated by $\\mathbf F$ with zero errors, so its prediction error $e_t$ is the same in both",
+          "statement": "Both predict the first observed period after the first interval from the states propagated by $\\mathbf F$ with zero errors, so its prediction error $e_t$ is the same in both",
           "by": [
             "D5",
             "D8"
@@ -3378,6 +3548,28 @@
         "level": "public"
       },
       "description": "Kullback-Leibler divergence, in both directions, between the exact convolution of Laplace, S and Generalised Normal errors with normal state uncertainty and its family-scaled, one-step and Gauss-Hermite approximations, for variance ratios $f_t$ from 1.01 to 100."
+    },
+    {
+      "id": "A10",
+      "kind": "proof",
+      "uri": "files/proof-checks/proof-checks.md",
+      "version": "sha256:2ccd9457ef876f55c27b3b0004c25c5a991507f6667c59795e7515cc552fd7f1",
+      "availability": {
+        "level": "public"
+      },
+      "licence": "CC-BY-4.0",
+      "description": "Report of the independent proof check by the contributor P6 (first round, 2026-11-11): for C1, C2, C5, C6, C8, C10, C12, C14, C16 and C19, the re-derivation, the numerical spot checks, the outcome and the gaps found; with proof-checks.json, proof-checks-2.md and proof-checks-2.json (the second round, on C2, C5, C10, C14 and C19 as corrected after the first) in the same folder."
+    },
+    {
+      "id": "A11",
+      "kind": "code",
+      "uri": "files/proof-checks/chk1.py",
+      "version": "sha256:88de8878db174afda5c9a385d6d46bd0b00e744ce5fa8402814f47aa9d65db8f",
+      "availability": {
+        "level": "public"
+      },
+      "licence": "LGPL-2.1-only",
+      "description": "The numerical spot checks of the independent proof check (chk1.py to chk4.py in the same folder; Python with numpy)."
     }
   ],
   "references": [

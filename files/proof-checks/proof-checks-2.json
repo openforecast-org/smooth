@@ -1,0 +1,57 @@
+[
+ {
+  "claim": "C2",
+  "evidence": "E2",
+  "outcome": "confirmed",
+  "extent": "full",
+  "notes": "Re-derived Fisher's identity (gradient of Q at the current estimate equals the observed-data score, valid at every iterate and so at EM fixed points) and the normal-variance example: the observed-data likelihood is stationary at S/T1 and the entropy-augmented one at S/T, different when T0>0 and S>0. Numerically with T1=60, T0=40 the maximisers are 3.318 and 1.991, and the cross-entropy gradient at the current estimate is 0 while that of -H is -0.385.",
+  "gaps": [
+   "E2.1 is a cited standard identity, not derived in the steps (I verified it).",
+   "The example shows the difference for the static normal case only; the dynamic models add a second difference through zero-error densities (C5), not stated in C2."
+  ]
+ },
+ {
+  "claim": "C5",
+  "evidence": "E6",
+  "outcome": "confirmed",
+  "extent": "full",
+  "notes": "Re-derived f=1+sum c_i^2>1 for some c_i!=0 and that the zero-error likelihood uses sigma^2 where the exact one uses sigma^2 f_t, so the likelihoods differ; the variance maximisers (1/T1)sum e^2 and (1/T1)sum v^2/f differ because their difference is positive when the first observed period after a gap is the last observation. In an ETS(A,N,N) check the two sums were 7.4975 and 6.7015, and the difference was positive in all 2000 random samples.",
+  "gaps": [
+   "E6.4 holds only after the first interval (or when the starting states coincide); at the next observed period v_t differs from e_t (0.038 against 0.219 in the check).",
+   "That the difference of the sums is not identically zero is left implicit in E6.5."
+  ]
+ },
+ {
+  "claim": "C10",
+  "evidence": "E12",
+  "outcome": "confirmed",
+  "extent": "full",
+  "notes": "P(0<=y<=u)=(1-p)+pF_z(u) for positive sizes, so coverage c>1-p needs F_z(u)=(c-(1-p))/p, a quantile of the size distribution whose mean is mu_hat while E(y)=p mu_hat. Monte Carlo with p=0.4, c=0.9 gave coverage 0.8997 and size level 0.7500.",
+  "gaps": [
+   "'The size has mean mu_hat' is a premise in E12.3, not derived; for ADAM multiplicative ETS the zero-error forecast is not the mean at h>=2 (C19).",
+   "c=1 gives an infinite bound for unbounded sizes."
+  ]
+ },
+ {
+  "claim": "C14",
+  "evidence": "E15",
+  "outcome": "confirmed",
+  "extent": "full",
+  "notes": "Verified that the integral of f log f equals -H_z (Gamma and Normal, to 1e-8), so the term that D4 now defines equals -H_z and the entropy enters with a negative sign. The earlier circularity is gone because D4 no longer fixes the sign.",
+  "gaps": [
+   "Whether D4 describes eq. B.6 of Svetunkov and Boylan (2023) faithfully, and what sign that paper prints, was not checked.",
+   "E15.3 restates D4."
+  ]
+ },
+ {
+  "claim": "C19",
+  "evidence": "E13",
+  "outcome": "confirmed",
+  "extent": "full",
+  "notes": "Re-derived E(z_{T+h}|Y_T)=mu_hat [E(1+eps)^alpha]^(h-1) for ETS(M,N,N), the strict Jensen inequality for 0<alpha<1 and non-degenerate errors, and the Gamma moment s^alpha Gamma(1/s+alpha)/Gamma(1/s). With s=0.32, alpha=0.21 the factor is 0.97309 and simulated conditional means for h=2,5,12 matched its powers within Monte Carlo error.",
+  "gaps": [
+   "The marker [[D20:ETS(M,N,N)]] points to a data definition (s=0.32, alpha=0.21, 100 observations), not the model class; use D12 or D6.",
+   "E13.4 cites E13.2 although it needs only the Gamma law."
+  ]
+ }
+]

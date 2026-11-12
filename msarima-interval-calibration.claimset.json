@@ -2,6 +2,7 @@
  "schema_version": "0.40",
  "paper": {
   "title": "Calibration of the prediction intervals of AutoMSARIMA in smooth on M1, M3, Tourism and M4",
+  "summary": "A prediction interval should contain the future value as often as it promises. This paper checks the intervals of AutoMSARIMA, the automatic ARIMA model of the smooth package for R and Python. When the model and its parameters are known, the intervals are calibrated at every level from 1% to 99%, and a newer version of smooth is calibrated at least as well as an older one. On series of the M4 competition, however, the 80% interval contained 81% of the future values for the series whose level rose least and only 55% for those whose level rose most. The same ARIMA fitted to the logarithms of the data, so that its errors grow with the level, removed that fall. Letting the software choose between the two kinds of error helped too, but by less than the planned test required, so that test is inconclusive.",
   "contributions": [
    "C1",
    "C2",
@@ -68,7 +69,7 @@
    "competing_interests": "The guarantor is the author and maintainer of the smooth package that the study evaluates."
   },
   "id": "entrylib:2026.000001",
-  "correction_reason": "The test quantities of the claims bound result entries that version 2 had turned into table cells; they now bind the cells, which keep the full precision the verdicts were computed at, and each table names the CSV of the lab results (A10) as its source. The defining equations of D1, D4, D11 and D13 are set as displayed equations."
+  "correction_reason": "Adds a plain-language summary of the paper (`paper.summary`), approved by the guarantor. The agents are named by their system, with what each did in `label`. No claim, evidence or ID changed."
  },
  "contributors": [
   {
@@ -89,7 +90,8 @@
   {
    "id": "P2",
    "type": "agent",
-   "name": "Research agent (Claude Code)",
+   "name": "Claude Code",
+   "label": "research",
    "positions": [
     "author"
    ],

@@ -16,7 +16,9 @@ elapsed time per fit likewise; a series counts as failed for a method when any o
 fits failed (each failed fit is replaced by seasonal naive 168, as in m4_hourly.py).
 A series whose RMSSE is undefined (a constant fitting window: zero scale) at any origin
 is left out of all statistics and counted.
-The statistics over the 370 series are those of m4_hourly.py.
+The statistics over the 370 series are those of m4_hourly.py, except that the t-tests
+against forecast::tbats and AutoTBATS test superiority (H0: relative RMSSE >= 1), as
+against seasonal naive 168.
 
 Run: python electricity_hourly.py --data electricity_nips.tar.gz --split test
 Writes the per-origin and per-series measures and the forecasts into $CLAIMSET_RUN_DIR
@@ -30,11 +32,13 @@ import tarfile
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+import m4_hourly
 import numpy as np
 import pandas as pd
 from m4_hourly import H, measures, run_r, run_series, statistics, warm_up
 
 WINDOW = 1008
+m4_hourly.MARGIN = 1.0  # superiority against every comparator (PL7)
 ORIGINS = 7
 
 

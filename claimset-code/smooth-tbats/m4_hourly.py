@@ -52,6 +52,7 @@ from scipy import stats
 H = 48
 LEVEL = 0.95
 ALPHA = 0.01
+MARGIN = 1.05
 HERE = Path(__file__).resolve().parent
 PYTHON_METHODS = ["smooth TBATS", "AutoTBATS", "ADAM ETS", "seasonal naive 168"]
 COMPARATORS = ["forecast::tbats", "AutoTBATS", "ADAM ETS", "seasonal naive 168"]
@@ -241,7 +242,7 @@ def statistics(table, split):
         ratios = np.log(wide["smooth TBATS"] / wide[comparator]).to_numpy()
         excluded = int(np.sum(~np.isfinite(ratios)))
         ratios = ratios[np.isfinite(ratios)]
-        null = np.log(1.05) if comparator in ("forecast::tbats", "AutoTBATS") else 0.0
+        null = np.log(MARGIN) if comparator in ("forecast::tbats", "AutoTBATS") else 0.0
         mean, lower, upper, p, n = one_sided(ratios, null)
         conditions = {**base, "method": "smooth TBATS", "comparator": comparator}
         results += [

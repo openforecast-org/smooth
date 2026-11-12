@@ -160,7 +160,7 @@ C13 [formal; secondary; support: argument W1; uses C2; warrant W1; verification 
 EVIDENCE
 E1 [formal; foundation Kolmogorov probability axioms] Analytical derivation in the source draft (artefact A1).
   assumes C31, C32
-  E1.1 $P(y_t=0\mid Y_{t-1})=(1-p_t)\int f(z\mid Y_{t-1})dz=1-p_t$ (by C31, C32; independence and continuity)
+  E1.1 $$P(y_t=0\mid Y_{t-1})=(1-p_t)\int f(z\mid Y_{t-1})dz=1-p_t$$ (by C31, C32; independence and continuity)
   E1.2 $y_t>0$ has density $p_tf(y_t\mid Y_{t-1})$ (by C31; independence)
   E1.3 The joint density of the observed data is the product of these conditional terms (by E1.1, E1.2; prediction-error decomposition)
 E2 [formal; foundation Kolmogorov probability axioms] Analytical derivation in the source draft (artefact A1).

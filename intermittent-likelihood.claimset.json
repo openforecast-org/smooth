@@ -2,6 +2,7 @@
   "schema_version": "0.41",
   "paper": {
     "title": "The observed-data likelihood of ADAM and iETS with unobserved periods",
+    "summary": "Intermittent demand, common for spare parts and slow-moving products, has many periods with no sales. Models of it, such as iETS in the smooth package, separate whether demand occurs from how large it is, so the size is unknown whenever nothing is sold. This paper derives the likelihood such a model should maximise: only the observed sizes count, and periods without demand enter only through the probability that demand occurs. The estimator iETS used adds a term for each period without demand, which changes the estimates: for normally distributed sizes it shrinks the variance by the share of periods observed. Treating unobserved periods as having zero error is not exact either. A Kalman filter gives the exact likelihood for additive models, and for log-normal ones on the logarithms; the paper also corrects ADAM's log-normal scale estimate, which overestimated the scale, and smooth implements all of this.",
     "licence": "CC-BY-4.0",
     "declarations": {
       "funding": [],
@@ -47,13 +48,14 @@
     "contribution_record": "complete",
     "origin": "native",
     "id": "entrylib:2026.000003",
-    "correction_reason": "The proofs of C1, C2, C5, C6, C8, C10, C12, C14, C16 and C19 were checked by an independent agent on a second model (contributor P6; reports in artefacts A10 and A11). Its first round found five proofs that showed less than their claims stated; these claims are corrected to what is proved: C2 completes its argument with the normal-variance case, C5 states its condition as a nonzero $\\mathbf w'\\mathbf F^{i-1}\\mathbf g$ and its conclusion for the objective and the variance, C10 states the conditions of the interval and that its bound is a quantile of the size distribution, C14 states the derivation of the sign (the sign printed by Svetunkov and Boylan, 2023, is in its relation), and C19 is stated for ETS(M,N,N) at horizons of two or more. The second round confirmed all ten in full. C14 rests on a formal proof (new evidence E15, definition D32) instead of an argument; D4 defines the term of each zero without presupposing its sign. Smaller precisions: C1 (positive sizes), C6 (the error mean enters the propagation through g), C8 depends on C15, C16 (alpha nonzero). Relations name references (B5-B7 added), and C1, C3, C6, C7, C9, C10 and C11 relate to the earlier work they extend or supersede. No claim ID changed."
+    "correction_reason": "Adds a plain-language summary of the paper (`paper.summary`), approved by the guarantor. The agents are named by their system, with what each did in `label`. The long formula of the first step of E1 is set on a line of its own. No claim, evidence or ID changed."
   },
   "contributors": [
     {
       "id": "P1",
       "type": "agent",
       "name": "Claude Code",
+      "label": "JSON preparation",
       "positions": [
         "author"
       ],
@@ -118,7 +120,8 @@
       ],
       "record_source": "user_reported",
       "id": "P3",
-      "name": "Claude Code (drafting agent)",
+      "name": "Claude Code",
+      "label": "drafting",
       "credit_roles": [
         "formal_analysis",
         "methodology",
@@ -160,7 +163,8 @@
       ],
       "record_source": "user_reported",
       "id": "P4",
-      "name": "Claude Code (numerical evidence agent)",
+      "name": "Claude Code",
+      "label": "numerical evidence",
       "credit_roles": [
         "investigation",
         "software",
@@ -183,7 +187,8 @@
     {
       "id": "P5",
       "type": "agent",
-      "name": "Claude Code (independent proof checker)",
+      "name": "Claude Code",
+      "label": "proof checking",
       "positions": [
         "contributor"
       ],
@@ -218,7 +223,8 @@
     {
       "id": "P6",
       "type": "agent",
-      "name": "Claude Code (independent proof checker, second model)",
+      "name": "Claude Code",
+      "label": "proof checking, second model",
       "positions": [
         "contributor"
       ],
@@ -253,7 +259,8 @@
     {
       "id": "P7",
       "type": "agent",
-      "name": "Claude Code (correction agent)",
+      "name": "Claude Code",
+      "label": "correction",
       "positions": [
         "author"
       ],
@@ -2128,7 +2135,7 @@
       "steps": [
         {
           "id": "E1.1",
-          "statement": "$P(y_t=0\\mid Y_{t-1})=(1-p_t)\\int f(z\\mid Y_{t-1})dz=1-p_t$",
+          "statement": "$$P(y_t=0\\mid Y_{t-1})=(1-p_t)\\int f(z\\mid Y_{t-1})dz=1-p_t$$",
           "by": [
             "C31",
             "C32"

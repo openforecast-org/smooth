@@ -1,0 +1,29 @@
+skewness of the log ratios {'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} -0.748249133828045
+excess kurtosis of the log ratios {'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 1.682043926328114
+lower end, 99% t-interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} -0.22699827679914697
+upper end, 99% t-interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} -0.10266308058665775
+lower end, 99% bootstrap interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} -0.22931943376259523
+upper end, 99% bootstrap interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} -0.10294930825688396
+largest end difference, bootstrap vs t, in t half-widths {'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 0.03733708610523109
+skewness of the log ratios {'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} -1.0226685660992183
+excess kurtosis of the log ratios {'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} 1.5009144811684232
+lower end, 99% t-interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} -0.29965823626788796
+upper end, 99% t-interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} -0.15679400287103706
+lower end, 99% bootstrap interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} -0.302627270302336
+upper end, 99% bootstrap interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} -0.15952390269903682
+largest end difference, bootstrap vs t, in t half-widths {'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} 0.0415644134834028
+skewness of the log ratios {'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} -1.6023254988091993
+excess kurtosis of the log ratios {'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} 4.854984738073149
+lower end, 99% t-interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} -0.16605056471148832
+upper end, 99% t-interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} 0.05979332324724974
+lower end, 99% bootstrap interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} -0.17004752776059098
+upper end, 99% bootstrap interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} 0.05703097162116321
+largest end difference, bootstrap vs t, in t half-widths {'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} 0.03539580446678201
+skewness of the log ratios {'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} -0.44597899987577494
+excess kurtosis of the log ratios {'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} -0.3089055971625032
+lower end, 99% t-interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} -0.7371766957438026
+upper end, 99% t-interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} -0.510681395991613
+lower end, 99% bootstrap interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} -0.7363634459755173
+upper end, 99% bootstrap interval of the mean log ratio {'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} -0.5123101859112925
+largest end difference, bootstrap vs t, in t half-widths {'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} 0.014382549407970858
+t-test stays (DC5: every end within 0.1 half-widths)  True

@@ -1,0 +1,59 @@
+RMSSE {'split': 'validation', 'method': 'ADAM ETS', 'statistic': 'mean'} 0.99351 
+RMSSE {'split': 'validation', 'method': 'ADAM ETS', 'statistic': 'median'} 0.64975 
+elapsed time {'split': 'validation', 'method': 'ADAM ETS', 'statistic': 'median'} 1.19567 
+series failed {'split': 'validation', 'method': 'ADAM ETS'} 0 
+coverage {'split': 'validation', 'method': 'ADAM ETS', 'nominal level': 0.95} 0.97359 
+RMSSE {'split': 'validation', 'method': 'AutoTBATS', 'statistic': 'mean'} 0.97408 
+RMSSE {'split': 'validation', 'method': 'AutoTBATS', 'statistic': 'median'} 0.59958 
+elapsed time {'split': 'validation', 'method': 'AutoTBATS', 'statistic': 'median'} 16.64437 
+series failed {'split': 'validation', 'method': 'AutoTBATS'} 0 
+coverage {'split': 'validation', 'method': 'AutoTBATS', 'nominal level': 0.95} 0.9442 
+RMSSE {'split': 'validation', 'method': 'forecast::tbats', 'statistic': 'mean'} 0.98036 
+RMSSE {'split': 'validation', 'method': 'forecast::tbats', 'statistic': 'median'} 0.6521 
+elapsed time {'split': 'validation', 'method': 'forecast::tbats', 'statistic': 'median'} 16.75171 
+series failed {'split': 'validation', 'method': 'forecast::tbats'} 0 
+coverage {'split': 'validation', 'method': 'forecast::tbats', 'nominal level': 0.95} 0.96801 
+RMSSE {'split': 'validation', 'method': 'seasonal naive 168', 'statistic': 'mean'} 0.65058 
+RMSSE {'split': 'validation', 'method': 'seasonal naive 168', 'statistic': 'median'} 0.7015 
+elapsed time {'split': 'validation', 'method': 'seasonal naive 168', 'statistic': 'median'} 5e-05 
+series failed {'split': 'validation', 'method': 'seasonal naive 168'} 0 
+RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'statistic': 'mean'} 0.80316 
+RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'statistic': 'median'} 0.59499 
+elapsed time {'split': 'validation', 'method': 'smooth TBATS', 'statistic': 'median'} 14.13565 
+series failed {'split': 'validation', 'method': 'smooth TBATS'} 0 
+coverage {'split': 'validation', 'method': 'smooth TBATS', 'nominal level': 0.95} 0.95722 
+relative RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 0.8692 {'level': 0.99, 'lower': 0.6498051819781014, 'upper': 1.1626642133842537}
+series in relative RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 8 
+series excluded by zero RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 0 
+relative RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} 0.95821 {'level': 0.99, 'lower': 0.7762433496172444, 'upper': 1.1828451008232128}
+series in relative RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} 8 
+series excluded by zero RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} 0 
+relative RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} 0.86516 {'level': 0.99, 'lower': 0.7216013650012612, 'upper': 1.0372783432102979}
+series in relative RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} 8 
+series excluded by zero RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} 0 
+relative RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} 1.05963 {'level': 0.99, 'lower': 0.4712288810039616, 'upper': 2.3827471476378204}
+series in relative RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} 8 
+series excluded by zero RMSSE {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} 0 
+relative elapsed time {'split': 'validation', 'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 0.81337 {'level': 0.99, 'lower': 0.5285783304953846, 'upper': 1.2515898764022566}
+mean rank of RMSSE, Nemenyi test {'split': 'validation', 'method': 'ADAM ETS'} 3.625 {'level': 0.99, 'lower': 2.3384724076713557, 'upper': 4.911527592328641}
+mean rank of RMSSE, Nemenyi test {'split': 'validation', 'method': 'AutoTBATS'} 2.5 {'level': 0.99, 'lower': 1.2134724076713566, 'upper': 3.7865275923286417}
+mean rank of RMSSE, Nemenyi test {'split': 'validation', 'method': 'forecast::tbats'} 3.125 {'level': 0.99, 'lower': 1.8384724076713566, 'upper': 4.411527592328642}
+mean rank of RMSSE, Nemenyi test {'split': 'validation', 'method': 'seasonal naive 168'} 3.5 {'level': 0.99, 'lower': 2.2134724076713566, 'upper': 4.786527592328642}
+mean rank of RMSSE, Nemenyi test {'split': 'validation', 'method': 'smooth TBATS'} 2.25 {'level': 0.99, 'lower': 0.9634724076713561, 'upper': 3.5365275923286412}
+critical distance, Nemenyi test (RMSSE) {'split': 'validation', 'level': 0.99} 2.57306 
+series in Nemenyi test {'split': 'validation'} 8 
+p-value, rmcb test of equal mean ranks (RMSSE) {'split': 'validation'} 0.31949 
+p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE) {'split': 'validation'} 0.0286 
+Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE) {'split': 'validation'} 0.11439 
+p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE) {'split': 'validation'} 0.08616 
+Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE) {'split': 'validation'} 0.20607 
+p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE) {'split': 'validation'} 0.59517 
+Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE) {'split': 'validation'} 0.59517 
+p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time) {'split': 'validation'} 0.06869 
+Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time) {'split': 'validation'} 0.20607 
+series excluded by undefined RMSSE {'split': 'validation'} 0 
+fits failed {'split': 'validation', 'method': 'ADAM ETS'} 0 
+fits failed {'split': 'validation', 'method': 'AutoTBATS'} 0 
+fits failed {'split': 'validation', 'method': 'forecast::tbats'} 0 
+fits failed {'split': 'validation', 'method': 'seasonal naive 168'} 0 
+fits failed {'split': 'validation', 'method': 'smooth TBATS'} 0 

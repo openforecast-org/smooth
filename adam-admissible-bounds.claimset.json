@@ -2,8 +2,9 @@
  "schema_version": "0.40",
  "paper": {
   "id": "entrylib:2026.000002",
-  "correction_reason": "Limitations L2 and L4 are answered by a planned independent check (new evidence E25): an exact oracle in rational arithmetic with certified root enclosures, written by a new contributor (P5) without the prototype, compared on the models of the planned tests; it agrees with the PBH reference, the cyclotomic cancellation, the step-down test and the bisection on every model it decides, and its four hypotheses are reported as claims C29-C32, one of them inconclusive by its rule. The assumptions C14 (reworded to the band the tests leave out) and C19 are tested by it; claims C1-C5, C10, C11 and C16 carry its checks; claims C3, C4, C16 and C24-C26 relate to the earlier work they extend, supersede or contradict. The lab record (A9) and the results file (A18) are updated to the record's current version. No earlier claim's conclusion or ID changed.",
+  "correction_reason": "Adds a plain-language summary of the paper (`paper.summary`), approved by the guarantor. The agents are named by their system, with what each did in `label`. No claim, evidence or ID changed.",
   "title": "Admissibility of lagged state space models through the ARIMA form of the whole model",
+  "summary": "Exponential smoothing forecasts by updating a few states, such as a level, a trend and seasonal patterns, every period. Its forecasts can be trusted only if the influence of the starting values and of old observations fades over time; such a model is called admissible. The smooth package checked this one seasonal part at a time. This paper shows that this check accepted many models whose weights never fade, and that checking the smoothing and ARIMA parts of a combined model separately gave the wrong answer for about a third of random models. It proposes checking the whole model at once, through the moving-average polynomial of its ARIMA form after removing the factors it shares with the autoregressive side. On thousands of random models this agreed with a reference method every time, an independent exact check agreed, and smooth now uses it.",
   "contributions": [
    "C3",
    "C25",
@@ -89,7 +90,8 @@
   {
    "id": "P2",
    "type": "agent",
-   "name": "Claude Code research agent",
+   "name": "Claude Code",
+   "label": "research",
    "positions": [
     "author"
    ],
@@ -151,7 +153,8 @@
   {
    "id": "P3",
    "type": "agent",
-   "name": "Independent checker agent",
+   "name": "Claude Code",
+   "label": "independent check",
    "positions": [
     "contributor"
    ],
@@ -186,7 +189,8 @@
   {
    "id": "P4",
    "type": "agent",
-   "name": "Independent checker of Q2 (ETS+ARIMA)",
+   "name": "Claude Code",
+   "label": "independent check of Q2 (ETS+ARIMA)",
    "positions": [
     "contributor"
    ],
@@ -221,7 +225,8 @@
   {
    "id": "P5",
    "type": "agent",
-   "name": "Independent oracle agent",
+   "name": "Claude Code",
+   "label": "independent exact oracle",
    "positions": [
     "contributor"
    ],
@@ -261,7 +266,8 @@
   {
    "id": "P6",
    "type": "agent",
-   "name": "Claude Code migration agent",
+   "name": "Claude Code",
+   "label": "migration and corrections",
    "positions": [
     "contributor"
    ],

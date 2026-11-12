@@ -1,0 +1,53 @@
+RMSSE {'split': 'test', 'method': 'ADAM ETS', 'statistic': 'mean'} 2.10048 
+RMSSE {'split': 'test', 'method': 'ADAM ETS', 'statistic': 'median'} 0.6314 
+elapsed time {'split': 'test', 'method': 'ADAM ETS', 'statistic': 'median'} 1.11221 
+series failed {'split': 'test', 'method': 'ADAM ETS'} 0 
+coverage {'split': 'test', 'method': 'ADAM ETS', 'nominal level': 0.95} 0.90555 
+RMSSE {'split': 'test', 'method': 'AutoTBATS', 'statistic': 'mean'} 1.06259 
+RMSSE {'split': 'test', 'method': 'AutoTBATS', 'statistic': 'median'} 0.68544 
+elapsed time {'split': 'test', 'method': 'AutoTBATS', 'statistic': 'median'} 19.70126 
+series failed {'split': 'test', 'method': 'AutoTBATS'} 0 
+coverage {'split': 'test', 'method': 'AutoTBATS', 'nominal level': 0.95} 0.91833 
+RMSSE {'split': 'test', 'method': 'forecast::tbats', 'statistic': 'mean'} 0.90938 
+RMSSE {'split': 'test', 'method': 'forecast::tbats', 'statistic': 'median'} 0.69796 
+elapsed time {'split': 'test', 'method': 'forecast::tbats', 'statistic': 'median'} 21.841 
+series failed {'split': 'test', 'method': 'forecast::tbats'} 0 
+coverage {'split': 'test', 'method': 'forecast::tbats', 'nominal level': 0.95} 0.91007 
+RMSSE {'split': 'test', 'method': 'seasonal naive 168', 'statistic': 'mean'} 1.45281 
+RMSSE {'split': 'test', 'method': 'seasonal naive 168', 'statistic': 'median'} 1.09526 
+elapsed time {'split': 'test', 'method': 'seasonal naive 168', 'statistic': 'median'} 4e-05 
+series failed {'split': 'test', 'method': 'seasonal naive 168'} 0 
+RMSSE {'split': 'test', 'method': 'smooth TBATS', 'statistic': 'mean'} 0.8294 
+RMSSE {'split': 'test', 'method': 'smooth TBATS', 'statistic': 'median'} 0.62416 
+elapsed time {'split': 'test', 'method': 'smooth TBATS', 'statistic': 'median'} 12.25145 
+series failed {'split': 'test', 'method': 'smooth TBATS'} 0 
+coverage {'split': 'test', 'method': 'smooth TBATS', 'nominal level': 0.95} 0.92733 
+relative RMSSE {'split': 'test', 'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 0.84804 {'level': 0.99, 'lower': 0.7969221555458947, 'upper': 0.9024309687802653}
+series in relative RMSSE {'split': 'test', 'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 414 
+series excluded by zero RMSSE {'split': 'test', 'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 0 
+relative RMSSE {'split': 'test', 'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} 0.79594 {'level': 0.99, 'lower': 0.741071448751255, 'upper': 0.854880143535765}
+series in relative RMSSE {'split': 'test', 'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} 414 
+series excluded by zero RMSSE {'split': 'test', 'method': 'smooth TBATS', 'comparator': 'AutoTBATS'} 0 
+relative RMSSE {'split': 'test', 'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} 0.94826 {'level': 0.99, 'lower': 0.8470034046237921, 'upper': 1.0616171122927285}
+series in relative RMSSE {'split': 'test', 'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} 414 
+series excluded by zero RMSSE {'split': 'test', 'method': 'smooth TBATS', 'comparator': 'ADAM ETS'} 0 
+relative RMSSE {'split': 'test', 'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} 0.53583 {'level': 0.99, 'lower': 0.47846285660893406, 'upper': 0.600086542905422}
+series in relative RMSSE {'split': 'test', 'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} 414 
+series excluded by zero RMSSE {'split': 'test', 'method': 'smooth TBATS', 'comparator': 'seasonal naive 168'} 0 
+relative elapsed time {'split': 'test', 'method': 'smooth TBATS', 'comparator': 'forecast::tbats'} 0.56818 {'level': 0.99, 'lower': 0.5281131840262834, 'upper': 0.6112776722925655}
+mean rank of RMSSE, Nemenyi test {'split': 'test', 'method': 'ADAM ETS'} 2.64493 {'level': 0.99, 'lower': 2.466087838176775, 'upper': 2.823767234286996}
+mean rank of RMSSE, Nemenyi test {'split': 'test', 'method': 'AutoTBATS'} 3.04348 {'level': 0.99, 'lower': 2.864638562814456, 'upper': 3.2223179589246773}
+mean rank of RMSSE, Nemenyi test {'split': 'test', 'method': 'forecast::tbats'} 2.9372 {'level': 0.99, 'lower': 2.758358369577741, 'upper': 3.1160377656879623}
+mean rank of RMSSE, Nemenyi test {'split': 'test', 'method': 'seasonal naive 168'} 3.81159 {'level': 0.99, 'lower': 3.632754504843442, 'upper': 3.990433900953663}
+mean rank of RMSSE, Nemenyi test {'split': 'test', 'method': 'smooth TBATS'} 2.5628 {'level': 0.99, 'lower': 2.3839622343120404, 'upper': 2.7416416304222615}
+critical distance, Nemenyi test (RMSSE) {'split': 'test', 'level': 0.99} 0.35768 
+series in Nemenyi test {'split': 'test'} 414 
+p-value, rmcb test of equal mean ranks (RMSSE) {'split': 'test'} 0.0 
+p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE) {'split': 'test'} 0.0 
+Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE) {'split': 'test'} 0.0 
+p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE) {'split': 'test'} 0.0 
+Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE) {'split': 'test'} 0.0 
+p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE) {'split': 'test'} 0.0 
+Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE) {'split': 'test'} 0.0 
+p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time) {'split': 'test'} 0.0 
+Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time) {'split': 'test'} 0.0 

@@ -61,10 +61,12 @@ def run_series(args):
 
 
 def test(values, null, name, split):
-    """The one-sided test of H0: mean >= null, as a result with its 1 - ALPHA interval."""
-    mean, lower, upper, p, n = one_sided(values, null)
+    """The one-sided test of H0: mean >= null over the finite values (a zero RMSSE or time
+    makes a log ratio non-finite), as a result with its 1 - ALPHA interval."""
+    finite = np.isfinite(values)
+    mean, lower, upper, p, n = one_sided(values[finite], null)
     return p, {"variable": name, "value": float(mean), "conditions": {"split": split},
-               "interval": {"level": 1 - ALPHA, "lower": float(lower), "upper": float(upper)}}, n
+               "interval": {"level": 1 - ALPHA, "lower": float(lower), "upper": float(upper)}}, n, int((~finite).sum())
 
 
 def statistics(series, split):
@@ -92,15 +94,18 @@ def statistics(series, split):
                      "mean log ratio of elapsed time, smooth TBATS dnorm to smooth TBATS", split),
     }
     adjusted = holm(np.array([t[0] for t in tests.values()]))
-    for (name, (p, result, n)), p_holm in zip(tests.items(), adjusted):
+    for (name, (p, result, n, excluded)), p_holm in zip(tests.items(), adjusted):
         results += [result,
                     {"variable": f"p-value, one-sided t-test, {name}", "value": p, "conditions": {"split": split}},
                     {"variable": f"Holm-adjusted p-value, one-sided t-test, {name}", "value": float(p_holm),
                      "conditions": {"split": split}},
-                    {"variable": f"series in the t-test, {name}", "value": n, "conditions": {"split": split}}]
+                    {"variable": f"series in the t-test, {name}", "value": n, "conditions": {"split": split}},
+                    {"variable": f"series excluded by a non-finite value, {name}", "value": excluded,
+                     "conditions": {"split": split}}]
     for name, num, den in (("relative RMSSE", dnorm, auto), ("relative elapsed time", dnorm, auto)):
         v = "RMSSE" if name == "relative RMSSE" else "seconds"
-        mean, lower, upper, _, _ = one_sided(np.log(wide[v][num] / wide[v][den]), 0)
+        ratio = np.log(wide[v][num] / wide[v][den])
+        mean, lower, upper, _, _ = one_sided(ratio[np.isfinite(ratio)], 0)
         results.append({"variable": name, "value": float(np.exp(mean)),
                         "conditions": {"split": split, "method": num, "comparator": den},
                         "interval": {"level": 1 - ALPHA, "lower": float(np.exp(lower)), "upper": float(np.exp(upper))}})

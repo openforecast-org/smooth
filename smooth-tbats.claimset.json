@@ -5,6 +5,7 @@
   "contributions": [
    "C1",
    "C3",
+   "C21",
    "C10",
    "C13",
    "C17"
@@ -61,15 +62,15 @@
    "competing_interests": "The guarantor is the author and maintainer of the smooth package whose TBATS the study evaluates."
   },
   "highlights": [
+   "D1",
    "C1",
-   "C3",
+   "C21",
    "C13",
-   "C17",
-   "D1"
+   "C17"
   ],
   "id": "entrylib:2026.000007",
   "summary": "TBATS forecasts series with several seasonal cycles, such as hourly electricity use with daily and weekly patterns. The smooth package for R and Python builds TBATS inside its general state space framework. Simulated checks show that, without ARMA terms, it is the same model as the original TBATS of De Livera, Hyndman and Snyder to rounding error; its ARMA terms differ, adding a separate component instead of modelling the errors. On the 414 hourly series of the M4 competition, forecasting 48 hours ahead, smooth's TBATS ranked as more accurate than the TBATS of R's forecast package and of Python's statsforecast, and took about 58% of the forecast package's time. On one week of 370 hourly electricity series, it was more accurate than repeating the last week, but not shown to differ from the other two. Assuming normally distributed errors made it faster, with intervals that covered fewer values than intended.",
-  "correction_reason": "The paper had no summary: a summary in plain language for readers outside forecasting is added, and the equation of the harmonic states in the definition of smooth TBATS (D1) is set on a line of its own instead of inside a sentence."
+  "correction_reason": "The paper had no summary and did not state why the ARMA part of smooth's TBATS differs from De Livera's in effect: a summary in plain language is added; a formal claim (C21, with its condition C22 and proof E6) shows that ARMA errors pass the ARMA's persistence into the level, while ADAM's additive ARMA component leaves the level a fixed share of each shock; the highlights are amended; and the equation of the harmonic states in D1 is set on a line of its own."
  },
  "contributors": [
   {
@@ -176,6 +177,39 @@
     },
     {
      "task": "json_preparation",
+     "extent": "full"
+    }
+   ]
+  },
+  {
+   "id": "P4",
+   "type": "agent",
+   "name": "Claude Code",
+   "label": "proof checking",
+   "positions": [
+    "contributor"
+   ],
+   "models": [
+    {
+     "model": "M1",
+     "role": "sole"
+    }
+   ],
+   "run_period": {
+    "start": "2026-11-13",
+    "end": "2026-11-13"
+   },
+   "tools": [
+    "code_execution",
+    "file_access"
+   ],
+   "system": {
+    "name": "Claude Code"
+   },
+   "record_source": "self_reported",
+   "ai_tasks": [
+    {
+     "task": "review",
      "extent": "full"
     }
    ]
@@ -2211,6 +2245,200 @@
    ],
    "verifiability": "open",
    "verifiability_flags": []
+  },
+  {
+   "id": "C21",
+   "statement": "For a local level with a stationary ARMA part, the additive ARMA component of [[D1:smooth TBATS]] keeps the permanent effect of a shock in the level and its transitory effect in the ARMA part, unlike the ARMA errors of [[D2:De Livera TBATS]] that pass the persistence of the ARMA part into the level.",
+   "depends_on": [
+    "C23",
+    "C24"
+   ],
+   "about": {
+    "subject": "D1",
+    "relation": "separates the permanent and the transitory effects of a shock, unlike",
+    "object": null,
+    "comparator": "D2",
+    "conditions": [
+     "a local level with a stationary ARMA part"
+    ]
+   },
+   "type": "formal",
+   "role": "principal",
+   "novelty": "no_prior_found",
+   "support": [
+    {
+     "kind": "formal_proof",
+     "evidence": "E6",
+     "locator": "S1-S6"
+    }
+   ],
+   "assumptions": [
+    "C22"
+   ],
+   "provenance": "author_stated",
+   "verification": "peer_checked",
+   "scope": {
+    "conditions": [
+     "a single source of error",
+     "a local level without trend or seasonal states",
+     "an ARMA part with stationary autoregressive polynomial",
+     "both formulations compared"
+    ]
+   },
+   "relations": [
+    {
+     "type": "explains",
+     "target": "C3",
+     "id_type": "local"
+    },
+    {
+     "type": "extends",
+     "reference": "B8",
+     "note": "The book defines ADAM's ARIMA as a component added to the other states in a single-source-of-error model."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Re-derived in a fresh context: the impulse responses and limits of S1-S6 hold, with the response 1 at lag 0 in both models; the unbounded limit needs alpha > 0 (now stated). ADAM's ARMA component checked in the code (the ARIMA rows of the transition matrix use only the ARIMA states, the level row does not depend on them, the persistence of the ARIMA states is the MA minus the AR polynomial) and numerically with the Python port: for an ANN level with alpha = 0.3 and ARMA orders (1,0), (1,1), (2,2), (3,1) and (0,2), the response at lags 1-30 equals alpha + psi_j to within 1.1e-16, and the level moves by alpha only."
+    },
+    {
+     "by": "P2",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "The guarantor re-read the derivation of E6 (steps S1-S6), with the conditions of C22 and alpha > 0, and the premise of the additive ARMA component as the code builds it, and confirmed every step."
+    }
+   ]
+  },
+  {
+   "id": "C22",
+   "statement": "The autoregressive polynomial $\\phi(B)$ of the ARMA part has all its roots outside the unit circle, and its moving average polynomial $\\theta(B)$ is invertible.",
+   "type": "formal",
+   "role": "supporting",
+   "support": [
+    {
+     "kind": "assumption"
+    }
+   ],
+   "provenance": "author_stated",
+   "assumption_category": "theorem_condition",
+   "check": "untestable"
+  },
+  {
+   "type": "formal",
+   "role": "supporting",
+   "novelty": "no_prior_found",
+   "assumptions": [
+    "C22"
+   ],
+   "provenance": "author_stated",
+   "verification": "peer_checked",
+   "scope": {
+    "conditions": [
+     "a single source of error",
+     "a local level without trend or seasonal states",
+     "an ARMA part with stationary autoregressive polynomial",
+     "ARMA errors"
+    ]
+   },
+   "id": "C23",
+   "statement": "Under the ARMA errors of [[D2:De Livera TBATS]], for a local level with smoothing parameter $\\alpha > 0$ and an ARMA part with polynomials $\\phi(B)$ and $\\theta(B)$, a unit shock moves the level permanently by $\\alpha \\theta(1) / \\phi(1)$, unbounded as a root of $\\phi(B)$ approaches 1.",
+   "about": {
+    "subject": "D2",
+    "relation": "moves the level permanently by alpha theta(1)/phi(1) per unit shock",
+    "object": null,
+    "comparator": null,
+    "conditions": [
+     "a local level with a stationary ARMA part"
+    ]
+   },
+   "support": [
+    {
+     "kind": "formal_proof",
+     "evidence": "E6",
+     "locator": "S1-S3, S6"
+    }
+   ],
+   "relations": [
+    {
+     "type": "extends",
+     "reference": "B4",
+     "note": "De Livera, Hyndman and Snyder's TBATS models the ARMA part as the errors that drive every state, including the level."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Re-derived in a fresh context: the impulse responses and limits of S1-S6 hold, with the response 1 at lag 0 in both models; the unbounded limit needs alpha > 0 (now stated). ADAM's ARMA component checked in the code (the ARIMA rows of the transition matrix use only the ARIMA states, the level row does not depend on them, the persistence of the ARIMA states is the MA minus the AR polynomial) and numerically with the Python port: for an ANN level with alpha = 0.3 and ARMA orders (1,0), (1,1), (2,2), (3,1) and (0,2), the response at lags 1-30 equals alpha + psi_j to within 1.1e-16, and the level moves by alpha only."
+    },
+    {
+     "by": "P2",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "The guarantor re-read the derivation of E6 (steps S1-S6), with the conditions of C22 and alpha > 0, and the premise of the additive ARMA component as the code builds it, and confirmed every step."
+    }
+   ]
+  },
+  {
+   "type": "formal",
+   "role": "supporting",
+   "novelty": "no_prior_found",
+   "assumptions": [
+    "C22"
+   ],
+   "provenance": "author_stated",
+   "verification": "peer_checked",
+   "scope": {
+    "conditions": [
+     "a single source of error",
+     "a local level without trend or seasonal states",
+     "an ARMA part with stationary autoregressive polynomial",
+     "an additive ARMA component"
+    ]
+   },
+   "id": "C24",
+   "statement": "Under the additive ARMA component of [[D1:smooth TBATS]], for a local level with smoothing parameter $\\alpha$ and a stationary ARMA part, a unit shock moves the level permanently by $\\alpha$ and the response of the ARMA part decays to zero.",
+   "about": {
+    "subject": "D1",
+    "relation": "moves the level permanently by alpha per unit shock",
+    "object": null,
+    "comparator": null,
+    "conditions": [
+     "a local level with a stationary ARMA part"
+    ]
+   },
+   "support": [
+    {
+     "kind": "formal_proof",
+     "evidence": "E6",
+     "locator": "S1, S4-S6"
+    }
+   ],
+   "relations": [
+    {
+     "type": "extends",
+     "reference": "B8",
+     "note": "The book defines ADAM's ARIMA as a component added to the other states in a single-source-of-error model."
+    }
+   ],
+   "checks": [
+    {
+     "by": "P4",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "Re-derived in a fresh context: the impulse responses and limits of S1-S6 hold, with the response 1 at lag 0 in both models; the unbounded limit needs alpha > 0 (now stated). ADAM's ARMA component checked in the code (the ARIMA rows of the transition matrix use only the ARIMA states, the level row does not depend on them, the persistence of the ARIMA states is the MA minus the AR polynomial) and numerically with the Python port: for an ANN level with alpha = 0.3 and ARMA orders (1,0), (1,1), (2,2), (3,1) and (0,2), the response at lags 1-30 equals alpha + psi_j to within 1.1e-16, and the level moves by alpha only."
+    },
+    {
+     "by": "P2",
+     "outcome": "confirmed",
+     "extent": "full",
+     "notes": "The guarantor re-read the derivation of E6 (steps S1-S6), with the conditions of C22 and alpha > 0, and the premise of the additive ARMA component as the code builds it, and confirmed every step."
+    }
+   ]
   }
  ],
  "evidence": [
@@ -3927,6 +4155,73 @@
     "level": "public"
    },
    "data_origin": "secondary"
+  },
+  {
+   "id": "E6",
+   "profile": "formal",
+   "availability": {
+    "level": "public"
+   },
+   "foundation": "linear difference equations and power series in the backshift operator $B$",
+   "assumptions": [
+    "C22"
+   ],
+   "steps": [
+    {
+     "id": "S1",
+     "rule": "definition",
+     "by": [
+      "D2",
+      "C22"
+     ],
+     "statement": "Under ARMA errors, $\\phi(B) d_t = \\theta(B) \\epsilon_t$ with $\\phi(B)$ stationary gives $d_t = \\psi(B) \\epsilon_t = \\sum_{k \\ge 0} \\psi_k \\epsilon_{t-k}$, with $\\psi(B) = \\theta(B) / \\phi(B)$, $\\psi_0 = 1$, $\\psi_k \\to 0$ and $\\sum_{k \\ge 0} \\psi_k = \\psi(1) = \\theta(1) / \\phi(1)$."
+    },
+    {
+     "id": "S2",
+     "rule": "substitution",
+     "by": [
+      "S1",
+      "D2"
+     ],
+     "statement": "The level of the ARMA-errors model moves by $l_t - l_{t-1} = \\alpha d_t = \\alpha \\psi(B) \\epsilon_t$, so a unit shock at $t$ moves $l_{t+j-1}$ by $\\alpha \\sum_{k=0}^{j-1} \\psi_k$ and $y_{t+j} = l_{t+j-1} + d_{t+j}$ by $r^{E}_j = \\psi_j + \\alpha \\sum_{k=0}^{j-1} \\psi_k$ for $j \\ge 1$."
+    },
+    {
+     "id": "S3",
+     "rule": "limit",
+     "by": [
+      "S1",
+      "S2"
+     ],
+     "statement": "$\\lim_{j \\to \\infty} r^{E}_j = \\alpha \\, \\theta(1) / \\phi(1)$: the level keeps $\\alpha \\psi(1)$ of every shock, and its increments $\\alpha \\psi(B) \\epsilon_t$ are autocorrelated unless $\\psi(B) = 1$, that is, unless there is no ARMA part, given that $\\theta(B)$ is invertible."
+    },
+    {
+     "id": "S4",
+     "rule": "definition",
+     "by": [
+      "D1"
+     ],
+     "statement": "Under ADAM's additive ARMA component, $y_t = l_{t-1} + a_t + \\epsilon_t$ with $a_t + \\epsilon_t = \\psi(B) \\epsilon_t$ and $l_t - l_{t-1} = \\alpha \\epsilon_t$, so a unit shock at $t$ moves $y_{t+j}$ by $r^{A}_j = \\alpha + \\psi_j$ for $j \\ge 1$."
+    },
+    {
+     "id": "S5",
+     "rule": "limit",
+     "by": [
+      "S1",
+      "S4"
+     ],
+     "statement": "$\\lim_{j \\to \\infty} r^{A}_j = \\alpha$: the level keeps $\\alpha$ of every shock, its increments $\\alpha \\epsilon_t$ are white noise, and the response of the ARMA part, $\\psi_j$, decays to zero."
+    },
+    {
+     "id": "S6",
+     "rule": "substitution",
+     "by": [
+      "S3",
+      "S5"
+     ],
+     "statement": "For an AR(1), $\\psi_j = \\phi^j$: $r^{E}_j = \\phi^j + \\alpha (1 - \\phi^j) / (1 - \\phi) \\to \\alpha / (1 - \\phi)$, which grows without bound as $\\phi \\to 1$ when $\\alpha > 0$, while $r^{A}_j = \\alpha + \\phi^j \\to \\alpha$."
+    }
+   ],
+   "description": "Derivation of the impulse responses of a local level with an ARMA part under ARMA errors and under ADAM's additive ARMA component, and their limits."
   }
  ],
  "warrants": [],

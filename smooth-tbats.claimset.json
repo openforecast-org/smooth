@@ -1,0 +1,4913 @@
+{
+  "schema_version": "0.41",
+  "paper": {
+    "title": "TBATS in smooth: formulation, rationale and performance on the M4 hourly data",
+    "contributions": [],
+    "autonomy": "unknown",
+    "contribution_record": "complete",
+    "origin": "native",
+    "exploration": {
+      "lab_record": "A9",
+      "questions": 2,
+      "hypotheses": {
+        "total": 20,
+        "supported": 12,
+        "not_supported": 0,
+        "inconclusive": 4,
+        "revised": 4,
+        "abandoned": 0,
+        "open": 0,
+        "from_exploration": 12
+      },
+      "tests": {
+        "total": 20,
+        "supported": 16,
+        "not_supported": 0,
+        "inconclusive": 4
+      },
+      "runs": {
+        "total": 14,
+        "confirmatory": 5,
+        "exploratory": 9,
+        "failed": 0
+      }
+    },
+    "study": "smooth-tbats"
+  },
+  "contributors": [
+    {
+      "id": "P1",
+      "type": "agent",
+      "name": "Research agent",
+      "positions": [
+        "author"
+      ],
+      "models": [
+        {
+          "model": "M1",
+          "role": "sole"
+        }
+      ],
+      "run_period": {
+        "start": "2026-11-11",
+        "end": "2026-11-12"
+      },
+      "tools": [
+        "code_execution"
+      ],
+      "system": {
+        "name": "Claude Code"
+      },
+      "record_source": "self_reported"
+    },
+    {
+      "id": "P2",
+      "type": "human",
+      "name": "Ivan Svetunkov",
+      "positions": [
+        "contributor"
+      ],
+      "orcid": "0000-0001-7826-0281"
+    },
+    {
+      "id": "P3",
+      "type": "agent",
+      "name": "Research agent (Ivan's PC)",
+      "positions": [
+        "author"
+      ],
+      "models": [
+        {
+          "model": "M1",
+          "role": "sole"
+        }
+      ],
+      "run_period": {
+        "start": "2026-11-12",
+        "end": "2026-11-13"
+      },
+      "tools": [
+        "code_execution"
+      ],
+      "system": {
+        "name": "Claude Code"
+      },
+      "record_source": "self_reported"
+    }
+  ],
+  "models": [
+    {
+      "id": "M1",
+      "provider": "Anthropic",
+      "name": "Claude Opus",
+      "version": "5.5",
+      "identifier": "claude-opus-5-5",
+      "accessed": "2026-11-11"
+    }
+  ],
+  "definitions": [
+    {
+      "id": "D1",
+      "term": "smooth TBATS",
+      "kind": "method",
+      "definition": "TBATS of the smooth package (R tbats(), Python TBATS), a linear single-source-of-error model in the Box-Cox space: y_t^(lambda) = w' v_{t-l} + e_t, v_t = F v_{t-l} + g e_t, with an ETS(A,N,N), ETS(A,A,N) or ETS(A,Ad,N) level and trend, and for each period m_i and harmonic j = 1..k_i (lambda_ij = 2 pi j / m_i) two states with lags 1 and 2 in the ARIMA slot of ADAM's core: u_t = v_{1,t-1} + v_{2,t-2}, v_{k,t} = eta_k u_t + g_k e_t with eta = (2 cos lambda_ij, -1) and g = (gamma_1i, sin(lambda_ij) gamma_2i - cos(lambda_ij) gamma_1i), so that (1 - 2 cos lambda_ij B + B^2) u_t = (g_1 B + g_2 B^2) e_t; an optional ADAM ARMA component (an additive state block, not ARMA errors); lambda in [0, 1] estimated by likelihood with the Jacobian; harmonics preselected by information criterion on a global OLS model of the Box-Cox series on Fourier terms; trend and ARMA orders selected by AICc."
+    },
+    {
+      "id": "D2",
+      "term": "De Livera TBATS",
+      "kind": "method",
+      "definition": "TBATS of De Livera, Hyndman and Snyder (2011, JASA): y_t^(lambda) = l_{t-1} + phi b_{t-1} + sum_i sum_j s^(i)_{j,t-1} + d_t, l_t = l_{t-1} + phi b_{t-1} + alpha d_t, b_t = phi b_{t-1} + beta d_t, s^(i)_{j,t} = cos(lambda_ij) s^(i)_{j,t-1} + sin(lambda_ij) s*^(i)_{j,t-1} + gamma_1i d_t, s*^(i)_{j,t} = -sin(lambda_ij) s^(i)_{j,t-1} + cos(lambda_ij) s*^(i)_{j,t-1} + gamma_2i d_t, with ARMA(p, q) errors d_t = sum phi_k d_{t-k} + sum theta_k e_{t-k} + e_t."
+    },
+    {
+      "id": "D3",
+      "term": "forecast::tbats",
+      "kind": "method",
+      "definition": "The tbats() function of the R package forecast (Hyndman et al.), De Livera et al.'s TBATS with its own model selection, called with seasonal.periods = c(24, 168), single-threaded, otherwise default settings."
+    },
+    {
+      "id": "D4",
+      "term": "AutoTBATS",
+      "kind": "method",
+      "definition": "AutoTBATS of the Python package statsforecast (Nixtla), called with season_length = [24, 168], otherwise default settings."
+    },
+    {
+      "id": "D5",
+      "term": "ADAM ETS",
+      "kind": "method",
+      "definition": "ADAM ETS of smooth's Python port, ADAM(model='ZXZ', lags=[24, 168]) with its default settings: ETS with a daily and a weekly seasonal component selected by AICc."
+    },
+    {
+      "id": "D6",
+      "term": "seasonal naive 168",
+      "kind": "method",
+      "definition": "Seasonal naive forecast repeating the last 168 observations (the last week) of the training sample."
+    },
+    {
+      "id": "D7",
+      "term": "M4 hourly",
+      "kind": "data",
+      "definition": "The 414 hourly series of the M4 competition (Makridakis et al., 2020), training samples of 700 or 960 observations and test samples of 48, from the Mcompetitions/M4-methods repository (Dataset/Train/Hourly-train.csv, Dataset/Test/Hourly-test.csv)."
+    },
+    {
+      "id": "D8",
+      "term": "M4 hourly validation split",
+      "kind": "data",
+      "definition": "The M4 hourly training samples with their last 48 observations held out as a validation test: fitting on observations 1..n-48 and evaluating on n-47..n; never the official test samples."
+    },
+    {
+      "id": "D9",
+      "term": "fixed-origin evaluation",
+      "kind": "design",
+      "definition": "Each method is fitted once to each training sample and forecasts h = 1..48 steps ahead from its end; no refits, no rolling origin."
+    },
+    {
+      "id": "D10",
+      "term": "MASE",
+      "kind": "variable",
+      "definition": "Mean absolute scaled error of a series: mean over h = 1..48 of |y_{n+h} - f_{n+h}| divided by the in-sample mean absolute seasonal difference at lag 24, as in M4."
+    },
+    {
+      "id": "D11",
+      "term": "relative MASE",
+      "kind": "variable",
+      "definition": "Geometric mean over series of MASE(method A)/MASE(method B); below 1 means A is more accurate. Its 95% confidence interval is exp of the t-interval of the mean log ratio over series."
+    },
+    {
+      "id": "D12",
+      "term": "coverage",
+      "kind": "variable",
+      "definition": "Share of the 414 x 48 test values inside the 95% prediction interval of a method."
+    },
+    {
+      "id": "D13",
+      "term": "elapsed time",
+      "kind": "variable",
+      "definition": "Wall-clock seconds to fit a method to one training sample and produce its forecasts and intervals, single-threaded."
+    },
+    {
+      "id": "D14",
+      "term": "formulation checks",
+      "kind": "design",
+      "definition": "Deterministic checks of smooth TBATS against its specification, per seed: (H1) random parameters, initial states and series of 300 observations simulated by De Livera's recursion with normal errors, for the periods {24}, {7.3}, {24, 168}, {7.3, 30.4}, no/additive/damped trend and lambda in {1, 0.5, 0}, fitted by smooth TBATS with all parameters and initial states fixed; (H2) a noise-free series of 300 observations made of a random level and random harmonics of the periods 7.3 and 24, fitted with random fixed persistence and initial='backcasting'; (H3) nine random pairs of alpha in (0.05, 0.95) and |phi| in (0.05, 0.95) for a local level with AR(1), the impulse response w'F^(j-1)g at j = 1..20 read from the fitted model's matrices. Code: claimset-code/smooth-tbats/formulation_checks.py."
+    },
+    {
+      "id": "D15",
+      "term": "Nemenyi test",
+      "kind": "design",
+      "definition": "The Nemenyi test of greybox's rmcb (Python port of R's greybox::rmcb, distribution='tukey', ties averaged): the methods are ranked within each series by the error measure the plan names (MASE under PL3, RMSSE from PL4 on), and two methods differ at level 1 - alpha when their mean ranks over series differ by more than the critical distance q_{1-alpha}(k, inf) / sqrt(2) * sqrt(k (k + 1) / (6 N)), for k methods and N series."
+    },
+    {
+      "id": "D16",
+      "term": "RMSSE",
+      "kind": "variable",
+      "definition": "Root mean squared scaled error of a series: sqrt(mean over h = 1..48 of (y_{n+h} - f_{n+h})^2) divided by sqrt(mean over t = 2..n of (y_t - y_{t-1})^2), the in-sample root mean squared first difference, as in M5."
+    },
+    {
+      "id": "D17",
+      "term": "relative RMSSE",
+      "kind": "variable",
+      "definition": "Geometric mean over series of RMSSE(method A)/RMSSE(method B); below 1 means A is more accurate. Its 99% confidence interval is exp of the t-interval of the mean log ratio over series."
+    },
+    {
+      "id": "D18",
+      "term": "electricity hourly",
+      "kind": "data",
+      "definition": "The 370 hourly series of electricity consumption (kW) of clients of a Portuguese utility in GluonTS's electricity_nips archive (SR3), drawn from UCI ElectricityLoadDiagrams20112014: each series is the archive's training series extended by its last test window, ending 2014-09-08 01:00, 1249 to 6001 hours long."
+    },
+    {
+      "id": "D19",
+      "term": "rolling-origin evaluation",
+      "kind": "design",
+      "definition": "Seven daily forecast origins over the last week of each series: the last one 48 hours before its end, the others 24, 48, ..., 144 hours earlier. At each origin each method is fitted to the 1008 preceding hours (six weeks) and forecasts 48 hours ahead; the RMSSE and the interval coverage of a series are averaged over its seven origins."
+    },
+    {
+      "id": "D20",
+      "term": "smooth TBATS dnorm",
+      "kind": "method",
+      "definition": "[[TM1:smooth TBATS]] with the normal distribution of the error term in the space of the transformed data: TBATS(lags=[1, 24, 168], distribution=\"dnorm\") of the Python smooth package, every other setting at its default. The default, distribution=\"auto\", selects the structure with the generalised normal distribution (dgnorm) and then fits the closest of the normal, Laplace and S distributions on it; dnorm selects and fits with the normal distribution only.",
+      "broader": [
+        "D1"
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "id": "C1",
+      "statement": "With the same smoothing parameters, damping, Box-Cox lambda and initial states, [[D1:smooth TBATS]] without ARMA gives the same one-step fitted values in the Box-Cox space as an independent implementation of [[D2:De Livera TBATS]]'s rotation-form recursion, to a relative difference below 1e-8, for integer and fractional periods and with no, additive and damped trends.",
+      "about": {
+        "subject": "D1",
+        "relation": "gives the same fitted values as",
+        "object": "D2",
+        "comparator": null,
+        "conditions": [
+          "same parameters and initial states, no ARMA"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E1",
+          "results": [
+            "E1.R1",
+            "E1.R2",
+            "E1.T1.r1"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H1",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-11T13:16:58Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "deterministic",
+        "parameters": {
+          "tolerance": 1e-08,
+          "refutation": 1e-06,
+          "machine_tolerance": 1e-12,
+          "sample": "10 seeds (101-110), one run, no stopping rule; the checks are deterministic given the seeds"
+        },
+        "quantities": {
+          "h1": {
+            "variable": "max relative difference of fitted values over all cases, smooth TBATS vs De Livera recursion"
+          }
+        },
+        "supported": "h1 < tolerance",
+        "not_supported": "h1 >= refutation",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL1",
+        "flags": [
+          "code_changed_after_plan"
+        ]
+      }
+    },
+    {
+      "id": "C2",
+      "statement": "Backcasting through the harmonic block of [[D1:smooth TBATS]] is exact: on a noise-free series made of a level and harmonics of a fractional period (7.3) and of an integer one (24), the fitted model with initial='backcasting' has in-sample errors below 1e-8 in absolute value.",
+      "about": {
+        "subject": "D1",
+        "relation": "fits without error",
+        "object": "noise-free harmonic series",
+        "comparator": null,
+        "conditions": [
+          "initial = backcasting"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E2",
+          "results": [
+            "E2.R2",
+            "E2.R1",
+            "E2.T1.r1"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H2",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-11T13:16:58Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "deterministic",
+        "parameters": {
+          "tolerance": 1e-08,
+          "refutation": 1e-06,
+          "machine_tolerance": 1e-12,
+          "sample": "10 seeds (101-110), one run, no stopping rule; the checks are deterministic given the seeds"
+        },
+        "quantities": {
+          "h2": {
+            "variable": "max absolute in-sample error over all noise-free series, backcasting"
+          }
+        },
+        "supported": "h2 < tolerance",
+        "not_supported": "h2 >= refutation",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL1",
+        "flags": [
+          "code_changed_after_plan"
+        ]
+      }
+    },
+    {
+      "id": "C3",
+      "statement": "The ARMA of [[D1:smooth TBATS]] is ADAM's additive ARMA component, not [[D2:De Livera TBATS]]'s ARMA errors: for a level with smoothing parameter alpha and an AR(1) with coefficient phi, the impulse response of y to the innovation at lag j >= 1 is alpha + phi^j in smooth's model matrices, against phi^j + alpha (1 - phi^j)/(1 - phi) for ARMA errors.",
+      "about": {
+        "subject": "D1",
+        "relation": "has the impulse response",
+        "object": "alpha + phi^j",
+        "comparator": "D2",
+        "conditions": []
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E3",
+          "results": [
+            "E3.T1.r1",
+            "E3.R1",
+            "E3.R2"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H3",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-11T13:16:58Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "deterministic",
+        "parameters": {
+          "tolerance": 1e-08,
+          "refutation": 1e-06,
+          "machine_tolerance": 1e-12,
+          "sample": "10 seeds (101-110), one run, no stopping rule; the checks are deterministic given the seeds"
+        },
+        "quantities": {
+          "h3_adam": {
+            "variable": "max absolute difference of smooth's impulse response from alpha + phi^j over all cases"
+          },
+          "h3_errors": {
+            "variable": "min over cases of the max absolute difference of smooth's impulse response from the ARMA-errors response"
+          }
+        },
+        "supported": "h3_adam < machine_tolerance and h3_errors > refutation",
+        "not_supported": "h3_adam >= refutation or h3_errors <= machine_tolerance",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL1",
+        "flags": [
+          "code_changed_after_plan"
+        ]
+      }
+    },
+    {
+      "id": "C4",
+      "statement": "On [[D7:M4 hourly]] with [[D9:fixed-origin evaluation]], [[D1:smooth TBATS]] is not less accurate than [[D3:forecast::tbats]] by more than 5%: the [[D11:relative MASE]] of smooth TBATS to forecast::tbats is below 1.05.",
+      "about": {
+        "subject": "D1",
+        "relation": "is non-inferior in MASE to",
+        "object": "D11",
+        "comparator": "D3",
+        "conditions": [
+          "D7"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E4",
+          "results": [
+            "E4.T1.r1",
+            "E4.R2",
+            "E4.R1",
+            "E4.R3",
+            "E4.R4",
+            "E4.R5",
+            "E4.R6",
+            "E4.R7",
+            "E4.R8"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H4",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-11T13:46:12Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of MASE (H4-H6) or elapsed time (H7), H0: mean log ratio >= log(1.05) against forecast::tbats and AutoTBATS (H4, H5), >= 0 against seasonal naive 168 (H6) and for the time (H7); their intervals are 99% t-intervals. H9: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series MASE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four t-tests of H4-H7; the Nemenyi test's own control for H9",
+          "margin": 1.05,
+          "coverage_threshold": 0.9,
+          "sample": "All 414 series of the official M4 hourly test split, fixed by the data set; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio is 0.015, so a true relative MASE of 1 lies 3.3 standard errors below the non-inferiority margin log(1.05)."
+        },
+        "quantities": {
+          "p_ftbats": {
+            "variable": "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE)",
+            "conditions": {
+              "split": "test"
+            }
+          },
+          "lower_ftbats": {
+            "variable": "D11",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS",
+              "comparator": "forecast::tbats"
+            },
+            "field": "interval.lower"
+          }
+        },
+        "supported": "p_ftbats < alpha",
+        "not_supported": "lower_ftbats > margin",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL3",
+        "flags": [
+          "holdout_used_elsewhere"
+        ]
+      }
+    },
+    {
+      "id": "C5",
+      "statement": "On [[D7:M4 hourly]] with [[D9:fixed-origin evaluation]], [[D1:smooth TBATS]] is not less accurate than [[D4:AutoTBATS]] by more than 5%: the [[D11:relative MASE]] of smooth TBATS to AutoTBATS is below 1.05.",
+      "about": {
+        "subject": "D1",
+        "relation": "is non-inferior in MASE to",
+        "object": "D11",
+        "comparator": "D4",
+        "conditions": [
+          "D7"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E5",
+          "results": [
+            "E5.T1.r1",
+            "E5.R3",
+            "E5.R1",
+            "E5.R2",
+            "E5.R4",
+            "E5.R5",
+            "E5.R6",
+            "E5.R7",
+            "E5.R8"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H5",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-11T13:46:12Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of MASE (H4-H6) or elapsed time (H7), H0: mean log ratio >= log(1.05) against forecast::tbats and AutoTBATS (H4, H5), >= 0 against seasonal naive 168 (H6) and for the time (H7); their intervals are 99% t-intervals. H9: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series MASE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four t-tests of H4-H7; the Nemenyi test's own control for H9",
+          "margin": 1.05,
+          "coverage_threshold": 0.9,
+          "sample": "All 414 series of the official M4 hourly test split, fixed by the data set; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio is 0.015, so a true relative MASE of 1 lies 3.3 standard errors below the non-inferiority margin log(1.05)."
+        },
+        "quantities": {
+          "p_autotbats": {
+            "variable": "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE)",
+            "conditions": {
+              "split": "test"
+            }
+          },
+          "lower_autotbats": {
+            "variable": "D11",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS",
+              "comparator": "AutoTBATS"
+            },
+            "field": "interval.lower"
+          }
+        },
+        "supported": "p_autotbats < alpha",
+        "not_supported": "lower_autotbats > margin",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL3",
+        "flags": [
+          "holdout_used_elsewhere"
+        ]
+      }
+    },
+    {
+      "id": "C6",
+      "statement": "On [[D7:M4 hourly]] with [[D9:fixed-origin evaluation]], [[D1:smooth TBATS]] is more accurate than [[D6:seasonal naive 168]]: the [[D11:relative MASE]] of smooth TBATS to seasonal naive 168 is below 1.",
+      "about": {
+        "subject": "D1",
+        "relation": "is more accurate in MASE than",
+        "object": "D11",
+        "comparator": "D6",
+        "conditions": [
+          "D7"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E6",
+          "results": [
+            "E6.T1.r1",
+            "E6.R4",
+            "E6.R1",
+            "E6.R2",
+            "E6.R3",
+            "E6.R5",
+            "E6.R6",
+            "E6.R7",
+            "E6.R8"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H6",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-11T13:46:12Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of MASE (H4-H6) or elapsed time (H7), H0: mean log ratio >= log(1.05) against forecast::tbats and AutoTBATS (H4, H5), >= 0 against seasonal naive 168 (H6) and for the time (H7); their intervals are 99% t-intervals. H9: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series MASE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four t-tests of H4-H7; the Nemenyi test's own control for H9",
+          "margin": 1.05,
+          "coverage_threshold": 0.9,
+          "sample": "All 414 series of the official M4 hourly test split, fixed by the data set; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio is 0.015, so a true relative MASE of 1 lies 3.3 standard errors below the non-inferiority margin log(1.05)."
+        },
+        "quantities": {
+          "p_snaive": {
+            "variable": "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE)",
+            "conditions": {
+              "split": "test"
+            }
+          },
+          "lower_snaive": {
+            "variable": "D11",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS",
+              "comparator": "seasonal naive 168"
+            },
+            "field": "interval.lower"
+          }
+        },
+        "supported": "p_snaive < alpha",
+        "not_supported": "lower_snaive >= 1",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL3",
+        "flags": [
+          "holdout_used_elsewhere"
+        ]
+      }
+    },
+    {
+      "id": "C7",
+      "statement": "On [[D7:M4 hourly]], [[D1:smooth TBATS]] takes less [[D13:elapsed time]] per series than [[D3:forecast::tbats]]: the geometric mean over series of the ratio of their elapsed times is below 1.",
+      "about": {
+        "subject": "D1",
+        "relation": "is faster than",
+        "object": "D13",
+        "comparator": "D3",
+        "conditions": [
+          "D7"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E7",
+          "results": [
+            "E7.T1.r1",
+            "E7.R5",
+            "E7.R1",
+            "E7.R2",
+            "E7.R3",
+            "E7.R4",
+            "E7.R6",
+            "E7.R7",
+            "E7.R8"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H7",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-11T13:46:12Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of MASE (H4-H6) or elapsed time (H7), H0: mean log ratio >= log(1.05) against forecast::tbats and AutoTBATS (H4, H5), >= 0 against seasonal naive 168 (H6) and for the time (H7); their intervals are 99% t-intervals. H9: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series MASE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four t-tests of H4-H7; the Nemenyi test's own control for H9",
+          "margin": 1.05,
+          "coverage_threshold": 0.9,
+          "sample": "All 414 series of the official M4 hourly test split, fixed by the data set; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio is 0.015, so a true relative MASE of 1 lies 3.3 standard errors below the non-inferiority margin log(1.05)."
+        },
+        "quantities": {
+          "p_time": {
+            "variable": "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time)",
+            "conditions": {
+              "split": "test"
+            }
+          },
+          "lower_time": {
+            "variable": "relative elapsed time",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS",
+              "comparator": "forecast::tbats"
+            },
+            "field": "interval.lower"
+          }
+        },
+        "supported": "p_time < alpha",
+        "not_supported": "lower_time >= 1",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL3",
+        "flags": [
+          "holdout_used_elsewhere"
+        ]
+      }
+    },
+    {
+      "id": "C8",
+      "statement": "On [[D7:M4 hourly]], the 95% prediction intervals of [[D1:smooth TBATS]] have a [[D12:coverage]] of at least 0.90.",
+      "about": {
+        "subject": "D1",
+        "relation": "has coverage of at least 0.90",
+        "object": "D12",
+        "comparator": null,
+        "conditions": [
+          "D7"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E8",
+          "results": [
+            "E8.R1",
+            "E8.R2",
+            "E8.R3",
+            "E8.R4",
+            "E8.R5",
+            "E8.R6",
+            "E8.R7",
+            "E8.R8",
+            "E8.T1.r1"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H8",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-11T13:46:12Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "deterministic",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of MASE (H4-H6) or elapsed time (H7), H0: mean log ratio >= log(1.05) against forecast::tbats and AutoTBATS (H4, H5), >= 0 against seasonal naive 168 (H6) and for the time (H7); their intervals are 99% t-intervals. H9: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series MASE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four t-tests of H4-H7; the Nemenyi test's own control for H9",
+          "margin": 1.05,
+          "coverage_threshold": 0.9,
+          "sample": "All 414 series of the official M4 hourly test split, fixed by the data set; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio is 0.015, so a true relative MASE of 1 lies 3.3 standard errors below the non-inferiority margin log(1.05)."
+        },
+        "quantities": {
+          "coverage": {
+            "variable": "D12",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS",
+              "nominal level": 0.95
+            }
+          }
+        },
+        "supported": "coverage >= coverage_threshold",
+        "not_supported": "coverage < coverage_threshold",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL3",
+        "flags": [
+          "holdout_used_elsewhere"
+        ]
+      }
+    },
+    {
+      "id": "C9",
+      "statement": "On [[D7:M4 hourly]] with [[D9:fixed-origin evaluation]], [[D1:smooth TBATS]] is more accurate than [[D3:forecast::tbats]] and [[D4:AutoTBATS]]: in the [[D15:Nemenyi test]] at the 1% level on the per-series [[D10:MASE]] of the five methods of Q2, the mean rank of smooth TBATS is lower than each of theirs by more than the critical distance.",
+      "about": {
+        "subject": "D1",
+        "relation": "has a lower mean rank of MASE, by more than the Nemenyi critical distance, than",
+        "object": "D10",
+        "comparator": "D3",
+        "conditions": [
+          "D7",
+          "D9"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E9",
+          "results": [
+            "E9.R8",
+            "E9.R7",
+            "E9.R6",
+            "E9.T1.r1",
+            "E9.R1",
+            "E9.R2",
+            "E9.R3",
+            "E9.R4",
+            "E9.R5"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H9",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-11T13:46:12Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of MASE (H4-H6) or elapsed time (H7), H0: mean log ratio >= log(1.05) against forecast::tbats and AutoTBATS (H4, H5), >= 0 against seasonal naive 168 (H6) and for the time (H7); their intervals are 99% t-intervals. H9: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series MASE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four t-tests of H4-H7; the Nemenyi test's own control for H9",
+          "margin": 1.05,
+          "coverage_threshold": 0.9,
+          "sample": "All 414 series of the official M4 hourly test split, fixed by the data set; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio is 0.015, so a true relative MASE of 1 lies 3.3 standard errors below the non-inferiority margin log(1.05)."
+        },
+        "quantities": {
+          "rank_smooth": {
+            "variable": "mean rank of MASE, Nemenyi test",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS"
+            }
+          },
+          "rank_ftbats": {
+            "variable": "mean rank of MASE, Nemenyi test",
+            "conditions": {
+              "split": "test",
+              "method": "forecast::tbats"
+            }
+          },
+          "rank_autotbats": {
+            "variable": "mean rank of MASE, Nemenyi test",
+            "conditions": {
+              "split": "test",
+              "method": "AutoTBATS"
+            }
+          },
+          "cd": {
+            "variable": "critical distance, Nemenyi test (MASE)",
+            "conditions": {
+              "split": "test",
+              "level": 0.99
+            }
+          }
+        },
+        "supported": "rank_ftbats - rank_smooth > cd and rank_autotbats - rank_smooth > cd",
+        "not_supported": "rank_smooth - rank_ftbats > cd or rank_smooth - rank_autotbats > cd",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL3",
+        "flags": [
+          "holdout_used_elsewhere"
+        ]
+      }
+    },
+    {
+      "id": "C10",
+      "statement": "On [[D7:M4 hourly]] with [[D9:fixed-origin evaluation]], [[D1:smooth TBATS]] is not less accurate than [[D3:forecast::tbats]] by more than 5%: the [[D17:relative RMSSE]] of smooth TBATS to forecast::tbats is below 1.05.",
+      "about": {
+        "subject": "D1",
+        "relation": "is non-inferior in RMSSE to",
+        "object": "D17",
+        "comparator": "D3",
+        "conditions": [
+          "D7"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E10",
+          "results": [
+            "E10.T1.r1",
+            "E10.R1",
+            "E10.R2",
+            "E10.R3",
+            "E10.R4",
+            "E10.R5",
+            "E10.R6"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H10",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-12T00:02:39Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of RMSSE (H10-H12), H0: mean log ratio >= log(1.05) against forecast::tbats and AutoTBATS (H10, H11), >= 0 against seasonal naive 168 (H12); their intervals are 99% t-intervals. H13: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series RMSSE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four one-sided t-tests the script computes (H10-H12 and the elapsed time against forecast::tbats, reported but not deciding here); the Nemenyi test's own control for H13",
+          "margin": 1.05,
+          "sample": "All 414 series of the official M4 hourly test split, fixed by the data set; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio is 0.015, so a true relative RMSSE of 1 lies 3.3 standard errors below the non-inferiority margin log(1.05)."
+        },
+        "quantities": {
+          "p_ftbats": {
+            "variable": "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE)",
+            "conditions": {
+              "split": "test"
+            }
+          },
+          "lower_ftbats": {
+            "variable": "D17",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS",
+              "comparator": "forecast::tbats"
+            },
+            "field": "interval.lower"
+          }
+        },
+        "supported": "p_ftbats < alpha",
+        "not_supported": "lower_ftbats > margin",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL5",
+        "flags": [
+          "code_changed_after_plan"
+        ]
+      }
+    },
+    {
+      "id": "C11",
+      "statement": "On [[D7:M4 hourly]] with [[D9:fixed-origin evaluation]], [[D1:smooth TBATS]] is not less accurate than [[D4:AutoTBATS]] by more than 5%: the [[D17:relative RMSSE]] of smooth TBATS to AutoTBATS is below 1.05.",
+      "about": {
+        "subject": "D1",
+        "relation": "is non-inferior in RMSSE to",
+        "object": "D17",
+        "comparator": "D4",
+        "conditions": [
+          "D7"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E11",
+          "results": [
+            "E11.T1.r1",
+            "E11.R2",
+            "E11.R1",
+            "E11.R3",
+            "E11.R4",
+            "E11.R5",
+            "E11.R6"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H11",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-12T00:02:39Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of RMSSE (H10-H12), H0: mean log ratio >= log(1.05) against forecast::tbats and AutoTBATS (H10, H11), >= 0 against seasonal naive 168 (H12); their intervals are 99% t-intervals. H13: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series RMSSE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four one-sided t-tests the script computes (H10-H12 and the elapsed time against forecast::tbats, reported but not deciding here); the Nemenyi test's own control for H13",
+          "margin": 1.05,
+          "sample": "All 414 series of the official M4 hourly test split, fixed by the data set; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio is 0.015, so a true relative RMSSE of 1 lies 3.3 standard errors below the non-inferiority margin log(1.05)."
+        },
+        "quantities": {
+          "p_autotbats": {
+            "variable": "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE)",
+            "conditions": {
+              "split": "test"
+            }
+          },
+          "lower_autotbats": {
+            "variable": "D17",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS",
+              "comparator": "AutoTBATS"
+            },
+            "field": "interval.lower"
+          }
+        },
+        "supported": "p_autotbats < alpha",
+        "not_supported": "lower_autotbats > margin",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL5",
+        "flags": [
+          "code_changed_after_plan"
+        ]
+      }
+    },
+    {
+      "id": "C12",
+      "statement": "On [[D7:M4 hourly]] with [[D9:fixed-origin evaluation]], [[D1:smooth TBATS]] is more accurate than [[D6:seasonal naive 168]]: the [[D17:relative RMSSE]] of smooth TBATS to seasonal naive 168 is below 1.",
+      "about": {
+        "subject": "D1",
+        "relation": "has lower RMSSE than",
+        "object": "D17",
+        "comparator": "D6",
+        "conditions": [
+          "D7"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E12",
+          "results": [
+            "E12.T1.r1",
+            "E12.R3",
+            "E12.R1",
+            "E12.R2",
+            "E12.R4",
+            "E12.R5",
+            "E12.R6"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H12",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-12T00:02:39Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of RMSSE (H10-H12), H0: mean log ratio >= log(1.05) against forecast::tbats and AutoTBATS (H10, H11), >= 0 against seasonal naive 168 (H12); their intervals are 99% t-intervals. H13: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series RMSSE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four one-sided t-tests the script computes (H10-H12 and the elapsed time against forecast::tbats, reported but not deciding here); the Nemenyi test's own control for H13",
+          "margin": 1.05,
+          "sample": "All 414 series of the official M4 hourly test split, fixed by the data set; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio is 0.015, so a true relative RMSSE of 1 lies 3.3 standard errors below the non-inferiority margin log(1.05)."
+        },
+        "quantities": {
+          "p_snaive": {
+            "variable": "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE)",
+            "conditions": {
+              "split": "test"
+            }
+          },
+          "lower_snaive": {
+            "variable": "D17",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS",
+              "comparator": "seasonal naive 168"
+            },
+            "field": "interval.lower"
+          }
+        },
+        "supported": "p_snaive < alpha",
+        "not_supported": "lower_snaive >= 1",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL5",
+        "flags": [
+          "code_changed_after_plan"
+        ]
+      }
+    },
+    {
+      "id": "C13",
+      "statement": "On [[D7:M4 hourly]] with [[D9:fixed-origin evaluation]], [[D1:smooth TBATS]] is more accurate than [[D3:forecast::tbats]] and [[D4:AutoTBATS]]: in the [[D15:Nemenyi test]] at the 1% level on the per-series [[D16:RMSSE]] of the five methods of Q2, the mean rank of smooth TBATS is lower than each of theirs by more than the critical distance.",
+      "about": {
+        "subject": "D1",
+        "relation": "has a lower mean rank of RMSSE, by more than the Nemenyi critical distance, than",
+        "object": "D16",
+        "comparator": "D3",
+        "conditions": [
+          "D7",
+          "D9"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E13",
+          "results": [
+            "E13.R6",
+            "E13.R5",
+            "E13.R4",
+            "E13.T1.r1",
+            "E13.R1",
+            "E13.R2",
+            "E13.R3"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H13",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-12T00:02:39Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of RMSSE (H10-H12), H0: mean log ratio >= log(1.05) against forecast::tbats and AutoTBATS (H10, H11), >= 0 against seasonal naive 168 (H12); their intervals are 99% t-intervals. H13: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series RMSSE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four one-sided t-tests the script computes (H10-H12 and the elapsed time against forecast::tbats, reported but not deciding here); the Nemenyi test's own control for H13",
+          "margin": 1.05,
+          "sample": "All 414 series of the official M4 hourly test split, fixed by the data set; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio is 0.015, so a true relative RMSSE of 1 lies 3.3 standard errors below the non-inferiority margin log(1.05)."
+        },
+        "quantities": {
+          "rank_smooth": {
+            "variable": "mean rank of RMSSE, Nemenyi test",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS"
+            }
+          },
+          "rank_ftbats": {
+            "variable": "mean rank of RMSSE, Nemenyi test",
+            "conditions": {
+              "split": "test",
+              "method": "forecast::tbats"
+            }
+          },
+          "rank_autotbats": {
+            "variable": "mean rank of RMSSE, Nemenyi test",
+            "conditions": {
+              "split": "test",
+              "method": "AutoTBATS"
+            }
+          },
+          "cd": {
+            "variable": "critical distance, Nemenyi test (RMSSE)",
+            "conditions": {
+              "split": "test",
+              "level": 0.99
+            }
+          }
+        },
+        "supported": "rank_ftbats - rank_smooth > cd and rank_autotbats - rank_smooth > cd",
+        "not_supported": "rank_smooth - rank_ftbats > cd or rank_smooth - rank_autotbats > cd",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL5",
+        "flags": [
+          "code_changed_after_plan"
+        ]
+      }
+    },
+    {
+      "id": "C14",
+      "statement": "On [[D18:electricity hourly]] with [[D19:rolling-origin evaluation]], [[D1:smooth TBATS]] is more accurate than [[D3:forecast::tbats]]: the [[D17:relative RMSSE]] of smooth TBATS to forecast::tbats is below 1.",
+      "about": {
+        "subject": "D1",
+        "relation": "has lower RMSSE than",
+        "object": "D17",
+        "comparator": "D3",
+        "conditions": [
+          "D18",
+          "D19"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E14",
+          "results": [
+            "E14.T1.r1",
+            "E14.R1",
+            "E14.R2",
+            "E14.R3",
+            "E14.R4",
+            "E14.R5",
+            "E14.R6"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H18",
+        "outcome": "inconclusive"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-12T10:23:25Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of RMSSE, H0: mean log ratio >= 0, against forecast::tbats (H18), AutoTBATS (H19) and seasonal naive 168 (H16); their intervals are 99% t-intervals. H17: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series RMSSE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four one-sided t-tests the script computes (H18, H19, H16 and the elapsed time against forecast::tbats, reported but not deciding here); the Nemenyi test's own control for H17",
+          "sample": "All 370 series of the electricity data (TM19) less those whose RMSSE is undefined (a constant fitting window; a data check before any method was run found series 322 constant in its windows), fixed by the data set; each series' RMSSE is its mean over the 7 origins; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio over 369 series is 0.016, so a true relative RMSSE of 0.95 lies 3.3 standard errors below 1 and is detected at alpha = 0.01 (one-sided, before Holm) with probability about 0.8."
+        },
+        "quantities": {
+          "p_ftbats": {
+            "variable": "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE)",
+            "conditions": {
+              "split": "test"
+            }
+          },
+          "lower_ftbats": {
+            "variable": "D17",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS",
+              "comparator": "forecast::tbats"
+            },
+            "field": "interval.lower"
+          }
+        },
+        "supported": "p_ftbats < alpha",
+        "not_supported": "lower_ftbats >= 1",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL7",
+        "flags": [
+          "code_changed_after_plan"
+        ]
+      }
+    },
+    {
+      "id": "C15",
+      "statement": "On [[D18:electricity hourly]] with [[D19:rolling-origin evaluation]], [[D1:smooth TBATS]] is more accurate than [[D4:AutoTBATS]]: the [[D17:relative RMSSE]] of smooth TBATS to AutoTBATS is below 1.",
+      "about": {
+        "subject": "D1",
+        "relation": "has lower RMSSE than",
+        "object": "D17",
+        "comparator": "D4",
+        "conditions": [
+          "D18",
+          "D19"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E15",
+          "results": [
+            "E15.T1.r1",
+            "E15.R2",
+            "E15.R1",
+            "E15.R3",
+            "E15.R4",
+            "E15.R5",
+            "E15.R6"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H19",
+        "outcome": "inconclusive"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-12T10:23:25Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of RMSSE, H0: mean log ratio >= 0, against forecast::tbats (H18), AutoTBATS (H19) and seasonal naive 168 (H16); their intervals are 99% t-intervals. H17: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series RMSSE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four one-sided t-tests the script computes (H18, H19, H16 and the elapsed time against forecast::tbats, reported but not deciding here); the Nemenyi test's own control for H17",
+          "sample": "All 370 series of the electricity data (TM19) less those whose RMSSE is undefined (a constant fitting window; a data check before any method was run found series 322 constant in its windows), fixed by the data set; each series' RMSSE is its mean over the 7 origins; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio over 369 series is 0.016, so a true relative RMSSE of 0.95 lies 3.3 standard errors below 1 and is detected at alpha = 0.01 (one-sided, before Holm) with probability about 0.8."
+        },
+        "quantities": {
+          "p_autotbats": {
+            "variable": "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE)",
+            "conditions": {
+              "split": "test"
+            }
+          },
+          "lower_autotbats": {
+            "variable": "D17",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS",
+              "comparator": "AutoTBATS"
+            },
+            "field": "interval.lower"
+          }
+        },
+        "supported": "p_autotbats < alpha",
+        "not_supported": "lower_autotbats >= 1",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL7",
+        "flags": [
+          "code_changed_after_plan"
+        ]
+      }
+    },
+    {
+      "id": "C16",
+      "statement": "On [[D18:electricity hourly]] with [[D19:rolling-origin evaluation]], [[D1:smooth TBATS]] is more accurate than [[D6:seasonal naive 168]]: the [[D17:relative RMSSE]] of smooth TBATS to seasonal naive 168 is below 1.",
+      "about": {
+        "subject": "D1",
+        "relation": "has lower RMSSE than",
+        "object": "D17",
+        "comparator": "D6",
+        "conditions": [
+          "D18",
+          "D19"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E16",
+          "results": [
+            "E16.T1.r1",
+            "E16.R3",
+            "E16.R1",
+            "E16.R2",
+            "E16.R4",
+            "E16.R5",
+            "E16.R6"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H16",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-12T10:23:25Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of RMSSE, H0: mean log ratio >= 0, against forecast::tbats (H18), AutoTBATS (H19) and seasonal naive 168 (H16); their intervals are 99% t-intervals. H17: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series RMSSE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four one-sided t-tests the script computes (H18, H19, H16 and the elapsed time against forecast::tbats, reported but not deciding here); the Nemenyi test's own control for H17",
+          "sample": "All 370 series of the electricity data (TM19) less those whose RMSSE is undefined (a constant fitting window; a data check before any method was run found series 322 constant in its windows), fixed by the data set; each series' RMSSE is its mean over the 7 origins; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio over 369 series is 0.016, so a true relative RMSSE of 0.95 lies 3.3 standard errors below 1 and is detected at alpha = 0.01 (one-sided, before Holm) with probability about 0.8."
+        },
+        "quantities": {
+          "p_snaive": {
+            "variable": "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE)",
+            "conditions": {
+              "split": "test"
+            }
+          },
+          "lower_snaive": {
+            "variable": "D17",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS",
+              "comparator": "seasonal naive 168"
+            },
+            "field": "interval.lower"
+          }
+        },
+        "supported": "p_snaive < alpha",
+        "not_supported": "lower_snaive >= 1",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL7",
+        "flags": [
+          "code_changed_after_plan"
+        ]
+      }
+    },
+    {
+      "id": "C17",
+      "statement": "On [[D18:electricity hourly]] with [[D19:rolling-origin evaluation]], [[D1:smooth TBATS]] is more accurate than [[D3:forecast::tbats]] and [[D4:AutoTBATS]]: in the [[D15:Nemenyi test]] at the 1% level on the per-series [[D16:RMSSE]] of the five methods of Q2, the mean rank of smooth TBATS is lower than each of theirs by more than the critical distance.",
+      "about": {
+        "subject": "D1",
+        "relation": "has a lower mean rank of RMSSE, by more than the Nemenyi critical distance, than",
+        "object": "D16",
+        "comparator": "D3",
+        "conditions": [
+          "D18",
+          "D19"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E17",
+          "results": [
+            "E17.R6",
+            "E17.R5",
+            "E17.R4",
+            "E17.T1.r1",
+            "E17.R1",
+            "E17.R2",
+            "E17.R3"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H17",
+        "outcome": "inconclusive"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-12T10:23:25Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-test on the per-series log ratios (smooth TBATS over the comparator) of RMSSE, H0: mean log ratio >= 0, against forecast::tbats (H18), AutoTBATS (H19) and seasonal naive 168 (H16); their intervals are 99% t-intervals. H17: the Nemenyi test (greybox rmcb, distribution='tukey', level 0.99, ranks averaged over ties) on the per-series RMSSE of the five methods, with its own family-wise control over the pairwise comparisons (not in the Holm family)",
+          "sides": "less",
+          "correction": "holm over the four one-sided t-tests the script computes (H18, H19, H16 and the elapsed time against forecast::tbats, reported but not deciding here); the Nemenyi test's own control for H17",
+          "sample": "All 370 series of the electricity data (TM19) less those whose RMSSE is undefined (a constant fitting window; a data check before any method was run found series 322 constant in its windows), fixed by the data set; each series' RMSSE is its mean over the 7 origins; one run, no interim analysis. For orientation: with a standard deviation of the per-series log ratio of 0.3, the standard error of the mean log ratio over 369 series is 0.016, so a true relative RMSSE of 0.95 lies 3.3 standard errors below 1 and is detected at alpha = 0.01 (one-sided, before Holm) with probability about 0.8."
+        },
+        "quantities": {
+          "rank_smooth": {
+            "variable": "mean rank of RMSSE, Nemenyi test",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS"
+            }
+          },
+          "rank_ftbats": {
+            "variable": "mean rank of RMSSE, Nemenyi test",
+            "conditions": {
+              "split": "test",
+              "method": "forecast::tbats"
+            }
+          },
+          "rank_autotbats": {
+            "variable": "mean rank of RMSSE, Nemenyi test",
+            "conditions": {
+              "split": "test",
+              "method": "AutoTBATS"
+            }
+          },
+          "cd": {
+            "variable": "critical distance, Nemenyi test (RMSSE)",
+            "conditions": {
+              "split": "test",
+              "level": 0.99
+            }
+          }
+        },
+        "supported": "rank_ftbats - rank_smooth > cd and rank_autotbats - rank_smooth > cd",
+        "not_supported": "rank_smooth - rank_ftbats > cd or rank_smooth - rank_autotbats > cd",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL7",
+        "flags": [
+          "code_changed_after_plan"
+        ]
+      }
+    },
+    {
+      "id": "C18",
+      "statement": "On [[D18:electricity hourly]] with [[D19:rolling-origin evaluation]], [[D20:smooth TBATS dnorm]] is less accurate than [[D1:smooth TBATS]] with its default distribution=\"auto\": the [[D17:relative RMSSE]] of smooth TBATS dnorm to smooth TBATS is above 1.",
+      "about": {
+        "subject": "D20",
+        "relation": "has higher error than",
+        "object": "D17",
+        "comparator": "D1",
+        "conditions": [
+          "D18",
+          "D19"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E18",
+          "results": [
+            "E18.T1.r1",
+            "E18.R2",
+            "E18.R1",
+            "E18.R3"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H20",
+        "outcome": "inconclusive"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-13T10:26:26Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-tests over series on the per-series means over the 7 origins: H20, the log ratio of RMSSE, smooth TBATS (auto) over smooth TBATS dnorm, H0: mean >= 0; H21, the coverage of the 95% interval of smooth TBATS dnorm minus 0.95, H0: mean >= 0; H22, the log ratio of the elapsed time, smooth TBATS dnorm over smooth TBATS (auto), H0: mean >= 0. Intervals are 99% t-intervals; relative RMSSE and relative elapsed time (dnorm over auto) are the exponentials of the mean log ratios and their intervals",
+          "sides": "less",
+          "correction": "holm over the three t-tests (H20, H21, H22)",
+          "sample": "All 370 series of the electricity data (TM19) less those whose RMSSE is undefined (series 322 in RN13) and, per test, those with a non-finite value; fixed by the data set; one run, no interim analysis"
+        },
+        "quantities": {
+          "p_rmsse": {
+            "variable": "Holm-adjusted p-value, one-sided t-test, RMSSE",
+            "conditions": {
+              "split": "test"
+            }
+          },
+          "up_rmsse": {
+            "variable": "D17",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS dnorm",
+              "comparator": "smooth TBATS"
+            },
+            "field": "interval.upper"
+          }
+        },
+        "supported": "p_rmsse < alpha",
+        "not_supported": "up_rmsse <= 1",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL8"
+      }
+    },
+    {
+      "id": "C19",
+      "statement": "On [[D18:electricity hourly]] with [[D19:rolling-origin evaluation]], the mean [[D12:coverage]] of the 95% prediction interval of [[D20:smooth TBATS dnorm]] is below the nominal 0.95.",
+      "about": {
+        "subject": "D20",
+        "relation": "has coverage below the nominal level",
+        "object": "D12",
+        "comparator": null,
+        "conditions": [
+          "D18",
+          "D19"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E19",
+          "results": [
+            "E19.T1.r1",
+            "E19.R1",
+            "E19.R2",
+            "E19.R3"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H21",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-13T10:26:26Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-tests over series on the per-series means over the 7 origins: H20, the log ratio of RMSSE, smooth TBATS (auto) over smooth TBATS dnorm, H0: mean >= 0; H21, the coverage of the 95% interval of smooth TBATS dnorm minus 0.95, H0: mean >= 0; H22, the log ratio of the elapsed time, smooth TBATS dnorm over smooth TBATS (auto), H0: mean >= 0. Intervals are 99% t-intervals; relative RMSSE and relative elapsed time (dnorm over auto) are the exponentials of the mean log ratios and their intervals",
+          "sides": "less",
+          "correction": "holm over the three t-tests (H20, H21, H22)",
+          "sample": "All 370 series of the electricity data (TM19) less those whose RMSSE is undefined (series 322 in RN13) and, per test, those with a non-finite value; fixed by the data set; one run, no interim analysis"
+        },
+        "quantities": {
+          "p_cov": {
+            "variable": "Holm-adjusted p-value, one-sided t-test, coverage",
+            "conditions": {
+              "split": "test"
+            }
+          },
+          "low_cov": {
+            "variable": "mean coverage of smooth TBATS dnorm minus 0.95",
+            "conditions": {
+              "split": "test"
+            },
+            "field": "interval.lower"
+          }
+        },
+        "supported": "p_cov < alpha",
+        "not_supported": "low_cov >= 0",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL8"
+      }
+    },
+    {
+      "id": "C20",
+      "statement": "On [[D18:electricity hourly]] with [[D19:rolling-origin evaluation]], [[D20:smooth TBATS dnorm]] is faster than [[D1:smooth TBATS]] with its default distribution=\"auto\": the relative [[D13:elapsed time]] of smooth TBATS dnorm to smooth TBATS is below 1.",
+      "about": {
+        "subject": "D20",
+        "relation": "takes less time than",
+        "object": "D13",
+        "comparator": "D1",
+        "conditions": [
+          "D18",
+          "D19"
+        ]
+      },
+      "type": "descriptive",
+      "role": "supporting",
+      "novelty": "no_prior_found",
+      "support": [
+        {
+          "kind": "empirical_quant",
+          "evidence": "E20",
+          "results": [
+            "E20.T1.r1",
+            "E20.R3",
+            "E20.R1",
+            "E20.R2"
+          ]
+        }
+      ],
+      "provenance": "author_stated",
+      "hypothesis": {
+        "lab_event": "H22",
+        "outcome": "supported"
+      },
+      "planning": "confirmatory",
+      "planned_at": "2026-11-13T10:26:26Z",
+      "planned_at_anchor": "git_remote",
+      "test": {
+        "framework": "frequentist",
+        "parameters": {
+          "alpha": 0.01,
+          "test": "one-sided one-sample t-tests over series on the per-series means over the 7 origins: H20, the log ratio of RMSSE, smooth TBATS (auto) over smooth TBATS dnorm, H0: mean >= 0; H21, the coverage of the 95% interval of smooth TBATS dnorm minus 0.95, H0: mean >= 0; H22, the log ratio of the elapsed time, smooth TBATS dnorm over smooth TBATS (auto), H0: mean >= 0. Intervals are 99% t-intervals; relative RMSSE and relative elapsed time (dnorm over auto) are the exponentials of the mean log ratios and their intervals",
+          "sides": "less",
+          "correction": "holm over the three t-tests (H20, H21, H22)",
+          "sample": "All 370 series of the electricity data (TM19) less those whose RMSSE is undefined (series 322 in RN13) and, per test, those with a non-finite value; fixed by the data set; one run, no interim analysis"
+        },
+        "quantities": {
+          "p_time": {
+            "variable": "Holm-adjusted p-value, one-sided t-test, time",
+            "conditions": {
+              "split": "test"
+            }
+          },
+          "low_time": {
+            "variable": "relative elapsed time",
+            "conditions": {
+              "split": "test",
+              "method": "smooth TBATS dnorm",
+              "comparator": "smooth TBATS"
+            },
+            "field": "interval.lower"
+          }
+        },
+        "supported": "p_time < alpha",
+        "not_supported": "low_time >= 1",
+        "verdict": "computed",
+        "runs": 1,
+        "lab_plan": "PL8"
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "E1",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN6 under plan PL1. Design: One run of claimset-code/smooth-tbats/formulation_checks.py --seeds 101 102 103 104 105 106 107 108 109 110 --n 300 (D14) on the code branch's committed code: H1 on 10 x 36 = 360 random cases; H2 on 10 random noise-free series; H3 on 90 random (alpha, phi) pairs. Python port of smooth from this repository, numpy and NLopt as installed (DC3). Analysis: The script writes, over all cases of the run: the max relative difference of the fitted values of smooth TBATS from the De Livera recursion (relative to max(|fitted|, 1)); the max absolute in-sample error over the noise-free series; the max absolute difference of smooth's impulse response from alpha + phi^j; and, over cases, the min of the max absolute difference from the ARMA-errors response phi^j + alpha (1 - phi^j)/(1 - phi).",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN6"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "max relative difference of fitted values over all cases, smooth TBATS vs De Livera recursion",
+          "value": 5.1122857914327425e-14,
+          "conditions": {
+            "seeds": "[101, 102, 103, 104, 105, 106, 107, 108, 109, 110]",
+            "cases": 360
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "max absolute in-sample error over all noise-free series, backcasting",
+          "value": 1.77e-09,
+          "conditions": {
+            "seeds": "[101, 102, 103, 104, 105, 106, 107, 108, 109, 110]",
+            "n": 300
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "max absolute difference of smooth's impulse response from alpha + phi^j over all cases, min over cases of the max absolute difference of smooth's impulse response from the ARMA-errors response (lab runs RN6)",
+          "row_labels": [],
+          "columns": [
+            "max absolute difference of smooth's impulse response from alpha + phi^j over all cases",
+            "min over cases of the max absolute difference of smooth's impulse response from the ARMA-errors response"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                2.22e-16,
+                0.01651
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D2"
+        ],
+        "procedure": [
+          "D14"
+        ]
+      },
+      "execution": {
+        "code_version": "3444ddada1be34139353afffdc25569fafd4f71a",
+        "software": {
+          "python": "3.11.18",
+          "platform": "Linux-6.18.44-fc-v378-x86_64-with-glibc2.39"
+        }
+      }
+    },
+    {
+      "id": "E2",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN6 under plan PL1. Design: One run of claimset-code/smooth-tbats/formulation_checks.py --seeds 101 102 103 104 105 106 107 108 109 110 --n 300 (D14) on the code branch's committed code: H1 on 10 x 36 = 360 random cases; H2 on 10 random noise-free series; H3 on 90 random (alpha, phi) pairs. Python port of smooth from this repository, numpy and NLopt as installed (DC3). Analysis: The script writes, over all cases of the run: the max relative difference of the fitted values of smooth TBATS from the De Livera recursion (relative to max(|fitted|, 1)); the max absolute in-sample error over the noise-free series; the max absolute difference of smooth's impulse response from alpha + phi^j; and, over cases, the min of the max absolute difference from the ARMA-errors response phi^j + alpha (1 - phi^j)/(1 - phi).",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN6"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "max relative difference of fitted values over all cases, smooth TBATS vs De Livera recursion",
+          "value": 5.112e-14,
+          "conditions": {
+            "seeds": "[101, 102, 103, 104, 105, 106, 107, 108, 109, 110]",
+            "cases": 360
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "max absolute in-sample error over all noise-free series, backcasting",
+          "value": 1.7696635268293903e-09,
+          "conditions": {
+            "seeds": "[101, 102, 103, 104, 105, 106, 107, 108, 109, 110]",
+            "n": 300
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "max absolute difference of smooth's impulse response from alpha + phi^j over all cases, min over cases of the max absolute difference of smooth's impulse response from the ARMA-errors response (lab runs RN6)",
+          "row_labels": [],
+          "columns": [
+            "max absolute difference of smooth's impulse response from alpha + phi^j over all cases",
+            "min over cases of the max absolute difference of smooth's impulse response from the ARMA-errors response"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                2.22e-16,
+                0.01651
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D2"
+        ],
+        "procedure": [
+          "D14"
+        ]
+      },
+      "execution": {
+        "code_version": "3444ddada1be34139353afffdc25569fafd4f71a",
+        "software": {
+          "python": "3.11.18",
+          "platform": "Linux-6.18.44-fc-v378-x86_64-with-glibc2.39"
+        }
+      }
+    },
+    {
+      "id": "E3",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN6 under plan PL1. Design: One run of claimset-code/smooth-tbats/formulation_checks.py --seeds 101 102 103 104 105 106 107 108 109 110 --n 300 (D14) on the code branch's committed code: H1 on 10 x 36 = 360 random cases; H2 on 10 random noise-free series; H3 on 90 random (alpha, phi) pairs. Python port of smooth from this repository, numpy and NLopt as installed (DC3). Analysis: The script writes, over all cases of the run: the max relative difference of the fitted values of smooth TBATS from the De Livera recursion (relative to max(|fitted|, 1)); the max absolute in-sample error over the noise-free series; the max absolute difference of smooth's impulse response from alpha + phi^j; and, over cases, the min of the max absolute difference from the ARMA-errors response phi^j + alpha (1 - phi^j)/(1 - phi).",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN6"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "max relative difference of fitted values over all cases, smooth TBATS vs De Livera recursion",
+          "value": 5.112e-14,
+          "conditions": {
+            "seeds": "[101, 102, 103, 104, 105, 106, 107, 108, 109, 110]",
+            "cases": 360
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "max absolute in-sample error over all noise-free series, backcasting",
+          "value": 1.77e-09,
+          "conditions": {
+            "seeds": "[101, 102, 103, 104, 105, 106, 107, 108, 109, 110]",
+            "n": 300
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "max absolute difference of smooth's impulse response from alpha + phi^j over all cases, min over cases of the max absolute difference of smooth's impulse response from the ARMA-errors response (lab runs RN6)",
+          "row_labels": [],
+          "columns": [
+            "max absolute difference of smooth's impulse response from alpha + phi^j over all cases",
+            "min over cases of the max absolute difference of smooth's impulse response from the ARMA-errors response"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                2.220446049250313e-16,
+                0.01651176558114527
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D2"
+        ],
+        "procedure": [
+          "D14"
+        ]
+      },
+      "execution": {
+        "code_version": "3444ddada1be34139353afffdc25569fafd4f71a",
+        "software": {
+          "python": "3.11.18",
+          "platform": "Linux-6.18.44-fc-v378-x86_64-with-glibc2.39"
+        }
+      }
+    },
+    {
+      "id": "E4",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN8 under plan PL3. Design: One run of claimset-code/smooth-tbats/m4_hourly.py --train SR1 --test SR2 --split test --workers 4 on the code branch's committed code (commit 3444dda or later with the same script), with the software of DC3: each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to each of the 414 M4 hourly training samples and forecasts the 48 test values (D9), each fit single-threaded, the series spread over 4 worker processes (forecast::tbats in R first, then the Python methods). A method that fails on a series (an error or non-finite forecasts) gets the seasonal naive 168 forecasts for it and no interval, its test values counting as uncovered; the failures are reported per method. Analysis: Per series and method: MASE (D10), the coverage of the 95% prediction interval (D12), the elapsed time (D13). Relative MASE (D11) of smooth TBATS to each comparator with its 99% t-interval on the log scale, the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H4: vs forecast::tbats, H0 log ratio >= log 1.05; H5: vs AutoTBATS, same; H6: vs seasonal naive 168, H0 >= 0; H7: time vs forecast::tbats, H0 >= 0), their p-values adjusted by Holm over the four. The coverage of smooth TBATS over all 414 x 48 test values (H8). The Nemenyi test (D15, rmcb, level 0.99) on the per-series MASE of the five methods: mean ranks and critical distance (H9). Also reported, not deciding: mean and median MASE, mean sMAPE, median time and failures per method, the relative MASE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN8"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D12",
+          "value": 0.9273,
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "nominal level": 0.95
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D11",
+          "value": 0.8317576290033031,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7793039397579915,
+            "upper": 0.8877418913345124
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D11",
+          "value": 0.7803,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7242363686872306,
+            "upper": 0.840737798842475
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "D11",
+          "value": 0.5067,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.44786668083806935,
+            "upper": 0.5733633134525995
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "relative elapsed time",
+          "value": 0.5791,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.5389759363891272,
+            "upper": 0.6221884358973419
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 3.077,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.8984549879352293,
+            "upper": 3.2561343840454504
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R7",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 2.954,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.7752665821381277,
+            "upper": 3.132945978248349
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R8",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 2.572,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.393624070060833,
+            "upper": 2.7513034661710543
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time); split: test (lab runs RN8)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (MASE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.3577,
+                5.798511501263025e-19,
+                2.698e-22,
+                1.509e-37,
+                4.615e-61
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D7"
+        ],
+        "procedure": [
+          "D9",
+          "D15"
+        ],
+        "lens": [
+          "D10",
+          "D11",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "3444ddada1be34139353afffdc25569fafd4f71a",
+        "software": {
+          "python": "3.11.18",
+          "platform": "Linux-6.18.44-fc-v378-x86_64-with-glibc2.39"
+        }
+      }
+    },
+    {
+      "id": "E5",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN8 under plan PL3. Design: One run of claimset-code/smooth-tbats/m4_hourly.py --train SR1 --test SR2 --split test --workers 4 on the code branch's committed code (commit 3444dda or later with the same script), with the software of DC3: each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to each of the 414 M4 hourly training samples and forecasts the 48 test values (D9), each fit single-threaded, the series spread over 4 worker processes (forecast::tbats in R first, then the Python methods). A method that fails on a series (an error or non-finite forecasts) gets the seasonal naive 168 forecasts for it and no interval, its test values counting as uncovered; the failures are reported per method. Analysis: Per series and method: MASE (D10), the coverage of the 95% prediction interval (D12), the elapsed time (D13). Relative MASE (D11) of smooth TBATS to each comparator with its 99% t-interval on the log scale, the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H4: vs forecast::tbats, H0 log ratio >= log 1.05; H5: vs AutoTBATS, same; H6: vs seasonal naive 168, H0 >= 0; H7: time vs forecast::tbats, H0 >= 0), their p-values adjusted by Holm over the four. The coverage of smooth TBATS over all 414 x 48 test values (H8). The Nemenyi test (D15, rmcb, level 0.99) on the per-series MASE of the five methods: mean ranks and critical distance (H9). Also reported, not deciding: mean and median MASE, mean sMAPE, median time and failures per method, the relative MASE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN8"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D12",
+          "value": 0.9273,
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "nominal level": 0.95
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D11",
+          "value": 0.8318,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7793039397579915,
+            "upper": 0.8877418913345124
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D11",
+          "value": 0.780315891451513,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7242363686872306,
+            "upper": 0.840737798842475
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "D11",
+          "value": 0.5067,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.44786668083806935,
+            "upper": 0.5733633134525995
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "relative elapsed time",
+          "value": 0.5791,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.5389759363891272,
+            "upper": 0.6221884358973419
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 3.077,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.8984549879352293,
+            "upper": 3.2561343840454504
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R7",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 2.954,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.7752665821381277,
+            "upper": 3.132945978248349
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R8",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 2.572,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.393624070060833,
+            "upper": 2.7513034661710543
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time); split: test (lab runs RN8)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (MASE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.3577,
+                5.799e-19,
+                2.6978102344588355e-22,
+                1.509e-37,
+                4.615e-61
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D7"
+        ],
+        "procedure": [
+          "D9",
+          "D15"
+        ],
+        "lens": [
+          "D10",
+          "D11",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "3444ddada1be34139353afffdc25569fafd4f71a",
+        "software": {
+          "python": "3.11.18",
+          "platform": "Linux-6.18.44-fc-v378-x86_64-with-glibc2.39"
+        }
+      }
+    },
+    {
+      "id": "E6",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN8 under plan PL3. Design: One run of claimset-code/smooth-tbats/m4_hourly.py --train SR1 --test SR2 --split test --workers 4 on the code branch's committed code (commit 3444dda or later with the same script), with the software of DC3: each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to each of the 414 M4 hourly training samples and forecasts the 48 test values (D9), each fit single-threaded, the series spread over 4 worker processes (forecast::tbats in R first, then the Python methods). A method that fails on a series (an error or non-finite forecasts) gets the seasonal naive 168 forecasts for it and no interval, its test values counting as uncovered; the failures are reported per method. Analysis: Per series and method: MASE (D10), the coverage of the 95% prediction interval (D12), the elapsed time (D13). Relative MASE (D11) of smooth TBATS to each comparator with its 99% t-interval on the log scale, the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H4: vs forecast::tbats, H0 log ratio >= log 1.05; H5: vs AutoTBATS, same; H6: vs seasonal naive 168, H0 >= 0; H7: time vs forecast::tbats, H0 >= 0), their p-values adjusted by Holm over the four. The coverage of smooth TBATS over all 414 x 48 test values (H8). The Nemenyi test (D15, rmcb, level 0.99) on the per-series MASE of the five methods: mean ranks and critical distance (H9). Also reported, not deciding: mean and median MASE, mean sMAPE, median time and failures per method, the relative MASE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN8"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D12",
+          "value": 0.9273,
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "nominal level": 0.95
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D11",
+          "value": 0.8318,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7793039397579915,
+            "upper": 0.8877418913345124
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D11",
+          "value": 0.7803,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7242363686872306,
+            "upper": 0.840737798842475
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "D11",
+          "value": 0.5067448313602549,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.44786668083806935,
+            "upper": 0.5733633134525995
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "relative elapsed time",
+          "value": 0.5791,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.5389759363891272,
+            "upper": 0.6221884358973419
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 3.077,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.8984549879352293,
+            "upper": 3.2561343840454504
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R7",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 2.954,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.7752665821381277,
+            "upper": 3.132945978248349
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R8",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 2.572,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.393624070060833,
+            "upper": 2.7513034661710543
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time); split: test (lab runs RN8)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (MASE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.3577,
+                5.799e-19,
+                2.698e-22,
+                1.5092330045971394e-37,
+                4.615e-61
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D7"
+        ],
+        "procedure": [
+          "D9",
+          "D15"
+        ],
+        "lens": [
+          "D10",
+          "D11",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "3444ddada1be34139353afffdc25569fafd4f71a",
+        "software": {
+          "python": "3.11.18",
+          "platform": "Linux-6.18.44-fc-v378-x86_64-with-glibc2.39"
+        }
+      }
+    },
+    {
+      "id": "E7",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN8 under plan PL3. Design: One run of claimset-code/smooth-tbats/m4_hourly.py --train SR1 --test SR2 --split test --workers 4 on the code branch's committed code (commit 3444dda or later with the same script), with the software of DC3: each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to each of the 414 M4 hourly training samples and forecasts the 48 test values (D9), each fit single-threaded, the series spread over 4 worker processes (forecast::tbats in R first, then the Python methods). A method that fails on a series (an error or non-finite forecasts) gets the seasonal naive 168 forecasts for it and no interval, its test values counting as uncovered; the failures are reported per method. Analysis: Per series and method: MASE (D10), the coverage of the 95% prediction interval (D12), the elapsed time (D13). Relative MASE (D11) of smooth TBATS to each comparator with its 99% t-interval on the log scale, the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H4: vs forecast::tbats, H0 log ratio >= log 1.05; H5: vs AutoTBATS, same; H6: vs seasonal naive 168, H0 >= 0; H7: time vs forecast::tbats, H0 >= 0), their p-values adjusted by Holm over the four. The coverage of smooth TBATS over all 414 x 48 test values (H8). The Nemenyi test (D15, rmcb, level 0.99) on the per-series MASE of the five methods: mean ranks and critical distance (H9). Also reported, not deciding: mean and median MASE, mean sMAPE, median time and failures per method, the relative MASE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN8"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D12",
+          "value": 0.9273,
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "nominal level": 0.95
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D11",
+          "value": 0.8318,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7793039397579915,
+            "upper": 0.8877418913345124
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D11",
+          "value": 0.7803,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7242363686872306,
+            "upper": 0.840737798842475
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "D11",
+          "value": 0.5067,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.44786668083806935,
+            "upper": 0.5733633134525995
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "relative elapsed time",
+          "value": 0.5790894532352115,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.5389759363891272,
+            "upper": 0.6221884358973419
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 3.077,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.8984549879352293,
+            "upper": 3.2561343840454504
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R7",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 2.954,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.7752665821381277,
+            "upper": 3.132945978248349
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R8",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 2.572,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.393624070060833,
+            "upper": 2.7513034661710543
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time); split: test (lab runs RN8)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (MASE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.3577,
+                5.799e-19,
+                2.698e-22,
+                1.509e-37,
+                4.6151072509330304e-61
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D7"
+        ],
+        "procedure": [
+          "D9",
+          "D15"
+        ],
+        "lens": [
+          "D10",
+          "D11",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "3444ddada1be34139353afffdc25569fafd4f71a",
+        "software": {
+          "python": "3.11.18",
+          "platform": "Linux-6.18.44-fc-v378-x86_64-with-glibc2.39"
+        }
+      }
+    },
+    {
+      "id": "E8",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN8 under plan PL3. Design: One run of claimset-code/smooth-tbats/m4_hourly.py --train SR1 --test SR2 --split test --workers 4 on the code branch's committed code (commit 3444dda or later with the same script), with the software of DC3: each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to each of the 414 M4 hourly training samples and forecasts the 48 test values (D9), each fit single-threaded, the series spread over 4 worker processes (forecast::tbats in R first, then the Python methods). A method that fails on a series (an error or non-finite forecasts) gets the seasonal naive 168 forecasts for it and no interval, its test values counting as uncovered; the failures are reported per method. Analysis: Per series and method: MASE (D10), the coverage of the 95% prediction interval (D12), the elapsed time (D13). Relative MASE (D11) of smooth TBATS to each comparator with its 99% t-interval on the log scale, the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H4: vs forecast::tbats, H0 log ratio >= log 1.05; H5: vs AutoTBATS, same; H6: vs seasonal naive 168, H0 >= 0; H7: time vs forecast::tbats, H0 >= 0), their p-values adjusted by Holm over the four. The coverage of smooth TBATS over all 414 x 48 test values (H8). The Nemenyi test (D15, rmcb, level 0.99) on the per-series MASE of the five methods: mean ranks and critical distance (H9). Also reported, not deciding: mean and median MASE, mean sMAPE, median time and failures per method, the relative MASE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN8"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D12",
+          "value": 0.9273349436392914,
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "nominal level": 0.95
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D11",
+          "value": 0.8318,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7793039397579915,
+            "upper": 0.8877418913345124
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D11",
+          "value": 0.7803,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7242363686872306,
+            "upper": 0.840737798842475
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "D11",
+          "value": 0.5067,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.44786668083806935,
+            "upper": 0.5733633134525995
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "relative elapsed time",
+          "value": 0.5791,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.5389759363891272,
+            "upper": 0.6221884358973419
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 3.077,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.8984549879352293,
+            "upper": 3.2561343840454504
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R7",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 2.954,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.7752665821381277,
+            "upper": 3.132945978248349
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R8",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 2.572,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.393624070060833,
+            "upper": 2.7513034661710543
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time); split: test (lab runs RN8)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (MASE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.3577,
+                5.799e-19,
+                2.698e-22,
+                1.509e-37,
+                4.615e-61
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D7"
+        ],
+        "procedure": [
+          "D9",
+          "D15"
+        ],
+        "lens": [
+          "D10",
+          "D11",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "3444ddada1be34139353afffdc25569fafd4f71a",
+        "software": {
+          "python": "3.11.18",
+          "platform": "Linux-6.18.44-fc-v378-x86_64-with-glibc2.39"
+        }
+      }
+    },
+    {
+      "id": "E9",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN8 under plan PL3. Design: One run of claimset-code/smooth-tbats/m4_hourly.py --train SR1 --test SR2 --split test --workers 4 on the code branch's committed code (commit 3444dda or later with the same script), with the software of DC3: each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to each of the 414 M4 hourly training samples and forecasts the 48 test values (D9), each fit single-threaded, the series spread over 4 worker processes (forecast::tbats in R first, then the Python methods). A method that fails on a series (an error or non-finite forecasts) gets the seasonal naive 168 forecasts for it and no interval, its test values counting as uncovered; the failures are reported per method. Analysis: Per series and method: MASE (D10), the coverage of the 95% prediction interval (D12), the elapsed time (D13). Relative MASE (D11) of smooth TBATS to each comparator with its 99% t-interval on the log scale, the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H4: vs forecast::tbats, H0 log ratio >= log 1.05; H5: vs AutoTBATS, same; H6: vs seasonal naive 168, H0 >= 0; H7: time vs forecast::tbats, H0 >= 0), their p-values adjusted by Holm over the four. The coverage of smooth TBATS over all 414 x 48 test values (H8). The Nemenyi test (D15, rmcb, level 0.99) on the per-series MASE of the five methods: mean ranks and critical distance (H9). Also reported, not deciding: mean and median MASE, mean sMAPE, median time and failures per method, the relative MASE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN8"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D12",
+          "value": 0.9273,
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "nominal level": 0.95
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D11",
+          "value": 0.8318,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7793039397579915,
+            "upper": 0.8877418913345124
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D11",
+          "value": 0.7803,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7242363686872306,
+            "upper": 0.840737798842475
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "D11",
+          "value": 0.5067,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.44786668083806935,
+            "upper": 0.5733633134525995
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "relative elapsed time",
+          "value": 0.5791,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.5389759363891272,
+            "upper": 0.6221884358973419
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 3.07729468599034,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.8984549879352293,
+            "upper": 3.2561343840454504
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R7",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 2.9541062801932383,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.7752665821381277,
+            "upper": 3.132945978248349
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R8",
+          "variable": "mean rank of MASE, Nemenyi test",
+          "value": 2.5724637681159437,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.393624070060833,
+            "upper": 2.7513034661710543
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time); split: test (lab runs RN8)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (MASE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (MASE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (time)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.35767939611022115,
+                5.799e-19,
+                2.698e-22,
+                1.509e-37,
+                4.615e-61
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D7"
+        ],
+        "procedure": [
+          "D9",
+          "D15"
+        ],
+        "lens": [
+          "D10",
+          "D11",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "3444ddada1be34139353afffdc25569fafd4f71a",
+        "software": {
+          "python": "3.11.18",
+          "platform": "Linux-6.18.44-fc-v378-x86_64-with-glibc2.39"
+        }
+      }
+    },
+    {
+      "id": "E10",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN11 under plan PL5. Design: One run of claimset-code/smooth-tbats/m4_hourly.py --train SR1 --test SR2 --split test --workers 4 on the code branch's committed code (commit fa9bb57, RMSSE in place of MASE, or later with the same script), with the software of DC3: each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to each of the 414 M4 hourly training samples and forecasts the 48 test values (D9), each fit single-threaded, the series spread over 4 worker processes (forecast::tbats in R first, then the Python methods). A method that fails on a series (an error or non-finite forecasts) gets the seasonal naive 168 forecasts for it and no interval; the failures are reported per method. The forecasts are recomputed, not taken from RN8. Analysis: Per series and method: RMSSE (D16), the coverage of the 95% prediction interval (D12), the elapsed time (D13). Relative RMSSE (D17) of smooth TBATS to each comparator with its 99% t-interval on the log scale, and the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H10: vs forecast::tbats, H0 log ratio >= log 1.05; H11: vs AutoTBATS, same; H12: vs seasonal naive 168, H0 >= 0; the time vs forecast::tbats, H0 >= 0, not deciding here), their p-values adjusted by Holm over the four. The Nemenyi test (D15, rmcb, level 0.99) on the per-series RMSSE of the five methods: mean ranks and critical distance (H13). Also reported, not deciding: mean and median RMSSE, median time, failures and coverage per method, the relative RMSSE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN11"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D17",
+          "value": 0.8480372827132892,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7969221555458947,
+            "upper": 0.9024309687802653
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D17",
+          "value": 0.7959,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.741071448751255,
+            "upper": 0.854880143535765
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D17",
+          "value": 0.5358,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.47846285660893406,
+            "upper": 0.600086542905422
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 3.043,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.864638562814456,
+            "upper": 3.2223179589246773
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.937,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.758358369577741,
+            "upper": 3.1160377656879623
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.563,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.3839622343120404,
+            "upper": 2.7416416304222615
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE); split: test (lab runs RN11)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (RMSSE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.3577,
+                9.427033177562526e-18,
+                2.363e-21,
+                1.303e-37
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D7"
+        ],
+        "procedure": [
+          "D9",
+          "D15"
+        ],
+        "lens": [
+          "D16",
+          "D17",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "1f24c10d7a472c654346afcc2c7158f9982e0659",
+        "software": {
+          "python": "3.11.18",
+          "platform": "Linux-6.18.44-fc-v378-x86_64-with-glibc2.39"
+        }
+      }
+    },
+    {
+      "id": "E11",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN11 under plan PL5. Design: One run of claimset-code/smooth-tbats/m4_hourly.py --train SR1 --test SR2 --split test --workers 4 on the code branch's committed code (commit fa9bb57, RMSSE in place of MASE, or later with the same script), with the software of DC3: each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to each of the 414 M4 hourly training samples and forecasts the 48 test values (D9), each fit single-threaded, the series spread over 4 worker processes (forecast::tbats in R first, then the Python methods). A method that fails on a series (an error or non-finite forecasts) gets the seasonal naive 168 forecasts for it and no interval; the failures are reported per method. The forecasts are recomputed, not taken from RN8. Analysis: Per series and method: RMSSE (D16), the coverage of the 95% prediction interval (D12), the elapsed time (D13). Relative RMSSE (D17) of smooth TBATS to each comparator with its 99% t-interval on the log scale, and the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H10: vs forecast::tbats, H0 log ratio >= log 1.05; H11: vs AutoTBATS, same; H12: vs seasonal naive 168, H0 >= 0; the time vs forecast::tbats, H0 >= 0, not deciding here), their p-values adjusted by Holm over the four. The Nemenyi test (D15, rmcb, level 0.99) on the per-series RMSSE of the five methods: mean ranks and critical distance (H13). Also reported, not deciding: mean and median RMSSE, median time, failures and coverage per method, the relative RMSSE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN11"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D17",
+          "value": 0.848,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7969221555458947,
+            "upper": 0.9024309687802653
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D17",
+          "value": 0.7959442609119876,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.741071448751255,
+            "upper": 0.854880143535765
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D17",
+          "value": 0.5358,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.47846285660893406,
+            "upper": 0.600086542905422
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 3.043,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.864638562814456,
+            "upper": 3.2223179589246773
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.937,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.758358369577741,
+            "upper": 3.1160377656879623
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.563,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.3839622343120404,
+            "upper": 2.7416416304222615
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE); split: test (lab runs RN11)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (RMSSE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.3577,
+                9.427e-18,
+                2.3628603624600894e-21,
+                1.303e-37
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D7"
+        ],
+        "procedure": [
+          "D9",
+          "D15"
+        ],
+        "lens": [
+          "D16",
+          "D17",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "1f24c10d7a472c654346afcc2c7158f9982e0659",
+        "software": {
+          "python": "3.11.18",
+          "platform": "Linux-6.18.44-fc-v378-x86_64-with-glibc2.39"
+        }
+      }
+    },
+    {
+      "id": "E12",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN11 under plan PL5. Design: One run of claimset-code/smooth-tbats/m4_hourly.py --train SR1 --test SR2 --split test --workers 4 on the code branch's committed code (commit fa9bb57, RMSSE in place of MASE, or later with the same script), with the software of DC3: each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to each of the 414 M4 hourly training samples and forecasts the 48 test values (D9), each fit single-threaded, the series spread over 4 worker processes (forecast::tbats in R first, then the Python methods). A method that fails on a series (an error or non-finite forecasts) gets the seasonal naive 168 forecasts for it and no interval; the failures are reported per method. The forecasts are recomputed, not taken from RN8. Analysis: Per series and method: RMSSE (D16), the coverage of the 95% prediction interval (D12), the elapsed time (D13). Relative RMSSE (D17) of smooth TBATS to each comparator with its 99% t-interval on the log scale, and the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H10: vs forecast::tbats, H0 log ratio >= log 1.05; H11: vs AutoTBATS, same; H12: vs seasonal naive 168, H0 >= 0; the time vs forecast::tbats, H0 >= 0, not deciding here), their p-values adjusted by Holm over the four. The Nemenyi test (D15, rmcb, level 0.99) on the per-series RMSSE of the five methods: mean ranks and critical distance (H13). Also reported, not deciding: mean and median RMSSE, median time, failures and coverage per method, the relative RMSSE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN11"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D17",
+          "value": 0.848,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7969221555458947,
+            "upper": 0.9024309687802653
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D17",
+          "value": 0.7959,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.741071448751255,
+            "upper": 0.854880143535765
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D17",
+          "value": 0.535834976024436,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.47846285660893406,
+            "upper": 0.600086542905422
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 3.043,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.864638562814456,
+            "upper": 3.2223179589246773
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.937,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.758358369577741,
+            "upper": 3.1160377656879623
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.563,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.3839622343120404,
+            "upper": 2.7416416304222615
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE); split: test (lab runs RN11)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (RMSSE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.3577,
+                9.427e-18,
+                2.363e-21,
+                1.302649972219819e-37
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D7"
+        ],
+        "procedure": [
+          "D9",
+          "D15"
+        ],
+        "lens": [
+          "D16",
+          "D17",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "1f24c10d7a472c654346afcc2c7158f9982e0659",
+        "software": {
+          "python": "3.11.18",
+          "platform": "Linux-6.18.44-fc-v378-x86_64-with-glibc2.39"
+        }
+      }
+    },
+    {
+      "id": "E13",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN11 under plan PL5. Design: One run of claimset-code/smooth-tbats/m4_hourly.py --train SR1 --test SR2 --split test --workers 4 on the code branch's committed code (commit fa9bb57, RMSSE in place of MASE, or later with the same script), with the software of DC3: each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to each of the 414 M4 hourly training samples and forecasts the 48 test values (D9), each fit single-threaded, the series spread over 4 worker processes (forecast::tbats in R first, then the Python methods). A method that fails on a series (an error or non-finite forecasts) gets the seasonal naive 168 forecasts for it and no interval; the failures are reported per method. The forecasts are recomputed, not taken from RN8. Analysis: Per series and method: RMSSE (D16), the coverage of the 95% prediction interval (D12), the elapsed time (D13). Relative RMSSE (D17) of smooth TBATS to each comparator with its 99% t-interval on the log scale, and the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H10: vs forecast::tbats, H0 log ratio >= log 1.05; H11: vs AutoTBATS, same; H12: vs seasonal naive 168, H0 >= 0; the time vs forecast::tbats, H0 >= 0, not deciding here), their p-values adjusted by Holm over the four. The Nemenyi test (D15, rmcb, level 0.99) on the per-series RMSSE of the five methods: mean ranks and critical distance (H13). Also reported, not deciding: mean and median RMSSE, median time, failures and coverage per method, the relative RMSSE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN11"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D17",
+          "value": 0.848,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7969221555458947,
+            "upper": 0.9024309687802653
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D17",
+          "value": 0.7959,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.741071448751255,
+            "upper": 0.854880143535765
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D17",
+          "value": 0.5358,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.47846285660893406,
+            "upper": 0.600086542905422
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 3.0434782608695667,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.864638562814456,
+            "upper": 3.2223179589246773
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.9371980676328517,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.758358369577741,
+            "upper": 3.1160377656879623
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.562801932367151,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.3839622343120404,
+            "upper": 2.7416416304222615
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE); split: test (lab runs RN11)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (RMSSE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.35767939611022115,
+                9.427e-18,
+                2.363e-21,
+                1.303e-37
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D7"
+        ],
+        "procedure": [
+          "D9",
+          "D15"
+        ],
+        "lens": [
+          "D16",
+          "D17",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "1f24c10d7a472c654346afcc2c7158f9982e0659",
+        "software": {
+          "python": "3.11.18",
+          "platform": "Linux-6.18.44-fc-v378-x86_64-with-glibc2.39"
+        }
+      }
+    },
+    {
+      "id": "E14",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN13 under plan PL7. Design: One run of claimset-code/smooth-tbats/electricity_hourly.py --data SR3 --split test --workers N on the code branch's committed code at the commit recorded with the run (1f24c10 or later, with the superiority null against every comparator), with the software and hardware recorded with the run (on AC2's computer or on this cloud machine): on each of the 370 electricity series (D18), at each of the 7 daily origins of the last week (D19), each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to the preceding 1008 hours and forecasts the next 48, each fit single-threaded, the 2590 windows spread over N worker processes (forecast::tbats in R first, then the Python methods). A fit that fails (an error or non-finite forecasts) gets the seasonal naive 168 forecasts and no interval; failed fits and series with a failed fit are reported per method. Analysis: Per window and method: RMSSE (D16, scaled by the root mean squared first difference of the fitting window), the coverage of the 95% prediction interval (D12), the elapsed time (D13); per series, their means over the 7 origins. Relative RMSSE (D17) of smooth TBATS to each comparator over the series with its 99% t-interval on the log scale, and the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H18: vs forecast::tbats, H0 log ratio >= 0; H19: vs AutoTBATS, same; H16: vs seasonal naive 168, same; the time vs forecast::tbats, H0 >= 0, not deciding here), their p-values adjusted by Holm over the four. The Nemenyi test (D15, rmcb, level 0.99) on the per-series RMSSE of the five methods: mean ranks and critical distance (H17). Also reported, not deciding: mean and median RMSSE, median time, failures and coverage per method, the relative RMSSE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN13"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D17",
+          "value": 0.9752899990850776,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.9470396739420402,
+            "upper": 1.0043830353548469
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D17",
+          "value": 0.9909,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.9753390861558684,
+            "upper": 1.006654290099668
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D17",
+          "value": 0.8244,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7980923108751354,
+            "upper": 0.8515454531276542
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.388,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.198102934861083,
+            "upper": 2.5769648158164165
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.558,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.3688346421781565,
+            "upper": 2.7476965231334898
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.482,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.292953883370568,
+            "upper": 2.6718157643259013
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE); split: test (lab runs RN13)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (RMSSE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.3789,
+                0.02814260346047013,
+                0.06692,
+                1.458e-41
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D18"
+        ],
+        "procedure": [
+          "D19",
+          "D15"
+        ],
+        "lens": [
+          "D16",
+          "D17",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "7cd242018acdf360e5fb49b3d990b72eb5395298",
+        "software": {
+          "python": "3.14.4",
+          "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
+        }
+      }
+    },
+    {
+      "id": "E15",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN13 under plan PL7. Design: One run of claimset-code/smooth-tbats/electricity_hourly.py --data SR3 --split test --workers N on the code branch's committed code at the commit recorded with the run (1f24c10 or later, with the superiority null against every comparator), with the software and hardware recorded with the run (on AC2's computer or on this cloud machine): on each of the 370 electricity series (D18), at each of the 7 daily origins of the last week (D19), each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to the preceding 1008 hours and forecasts the next 48, each fit single-threaded, the 2590 windows spread over N worker processes (forecast::tbats in R first, then the Python methods). A fit that fails (an error or non-finite forecasts) gets the seasonal naive 168 forecasts and no interval; failed fits and series with a failed fit are reported per method. Analysis: Per window and method: RMSSE (D16, scaled by the root mean squared first difference of the fitting window), the coverage of the 95% prediction interval (D12), the elapsed time (D13); per series, their means over the 7 origins. Relative RMSSE (D17) of smooth TBATS to each comparator over the series with its 99% t-interval on the log scale, and the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H18: vs forecast::tbats, H0 log ratio >= 0; H19: vs AutoTBATS, same; H16: vs seasonal naive 168, same; the time vs forecast::tbats, H0 >= 0, not deciding here), their p-values adjusted by Holm over the four. The Nemenyi test (D15, rmcb, level 0.99) on the per-series RMSSE of the five methods: mean ranks and critical distance (H17). Also reported, not deciding: mean and median RMSSE, median time, failures and coverage per method, the relative RMSSE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN13"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D17",
+          "value": 0.9753,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.9470396739420402,
+            "upper": 1.0043830353548469
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D17",
+          "value": 0.990872986502657,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.9753390861558684,
+            "upper": 1.006654290099668
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D17",
+          "value": 0.8244,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7980923108751354,
+            "upper": 0.8515454531276542
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.388,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.198102934861083,
+            "upper": 2.5769648158164165
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.558,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.3688346421781565,
+            "upper": 2.7476965231334898
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.482,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.292953883370568,
+            "upper": 2.6718157643259013
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE); split: test (lab runs RN13)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (RMSSE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.3789,
+                0.02814,
+                0.06691757930915539,
+                1.458e-41
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D18"
+        ],
+        "procedure": [
+          "D19",
+          "D15"
+        ],
+        "lens": [
+          "D16",
+          "D17",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "7cd242018acdf360e5fb49b3d990b72eb5395298",
+        "software": {
+          "python": "3.14.4",
+          "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
+        }
+      }
+    },
+    {
+      "id": "E16",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN13 under plan PL7. Design: One run of claimset-code/smooth-tbats/electricity_hourly.py --data SR3 --split test --workers N on the code branch's committed code at the commit recorded with the run (1f24c10 or later, with the superiority null against every comparator), with the software and hardware recorded with the run (on AC2's computer or on this cloud machine): on each of the 370 electricity series (D18), at each of the 7 daily origins of the last week (D19), each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to the preceding 1008 hours and forecasts the next 48, each fit single-threaded, the 2590 windows spread over N worker processes (forecast::tbats in R first, then the Python methods). A fit that fails (an error or non-finite forecasts) gets the seasonal naive 168 forecasts and no interval; failed fits and series with a failed fit are reported per method. Analysis: Per window and method: RMSSE (D16, scaled by the root mean squared first difference of the fitting window), the coverage of the 95% prediction interval (D12), the elapsed time (D13); per series, their means over the 7 origins. Relative RMSSE (D17) of smooth TBATS to each comparator over the series with its 99% t-interval on the log scale, and the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H18: vs forecast::tbats, H0 log ratio >= 0; H19: vs AutoTBATS, same; H16: vs seasonal naive 168, same; the time vs forecast::tbats, H0 >= 0, not deciding here), their p-values adjusted by Holm over the four. The Nemenyi test (D15, rmcb, level 0.99) on the per-series RMSSE of the five methods: mean ranks and critical distance (H17). Also reported, not deciding: mean and median RMSSE, median time, failures and coverage per method, the relative RMSSE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN13"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D17",
+          "value": 0.9753,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.9470396739420402,
+            "upper": 1.0043830353548469
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D17",
+          "value": 0.9909,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.9753390861558684,
+            "upper": 1.006654290099668
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D17",
+          "value": 0.8243857583084898,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7980923108751354,
+            "upper": 0.8515454531276542
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.388,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.198102934861083,
+            "upper": 2.5769648158164165
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.558,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.3688346421781565,
+            "upper": 2.7476965231334898
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.482,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.292953883370568,
+            "upper": 2.6718157643259013
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE); split: test (lab runs RN13)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (RMSSE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.3789,
+                0.02814,
+                0.06692,
+                1.4582738129581806e-41
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D18"
+        ],
+        "procedure": [
+          "D19",
+          "D15"
+        ],
+        "lens": [
+          "D16",
+          "D17",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "7cd242018acdf360e5fb49b3d990b72eb5395298",
+        "software": {
+          "python": "3.14.4",
+          "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
+        }
+      }
+    },
+    {
+      "id": "E17",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN13 under plan PL7. Design: One run of claimset-code/smooth-tbats/electricity_hourly.py --data SR3 --split test --workers N on the code branch's committed code at the commit recorded with the run (1f24c10 or later, with the superiority null against every comparator), with the software and hardware recorded with the run (on AC2's computer or on this cloud machine): on each of the 370 electricity series (D18), at each of the 7 daily origins of the last week (D19), each of smooth TBATS (TBATS(lags=[1, 24, 168]) with its defaults, h = 48, 95% prediction intervals), forecast::tbats (D3), AutoTBATS (D4), ADAM ETS (D5) and seasonal naive 168 (D6) is fitted once to the preceding 1008 hours and forecasts the next 48, each fit single-threaded, the 2590 windows spread over N worker processes (forecast::tbats in R first, then the Python methods). A fit that fails (an error or non-finite forecasts) gets the seasonal naive 168 forecasts and no interval; failed fits and series with a failed fit are reported per method. Analysis: Per window and method: RMSSE (D16, scaled by the root mean squared first difference of the fitting window), the coverage of the 95% prediction interval (D12), the elapsed time (D13); per series, their means over the 7 origins. Relative RMSSE (D17) of smooth TBATS to each comparator over the series with its 99% t-interval on the log scale, and the relative elapsed time to forecast::tbats likewise; four one-sided t-tests on the mean log ratios at alpha = 0.01 (H18: vs forecast::tbats, H0 log ratio >= 0; H19: vs AutoTBATS, same; H16: vs seasonal naive 168, same; the time vs forecast::tbats, H0 >= 0, not deciding here), their p-values adjusted by Holm over the four. The Nemenyi test (D15, rmcb, level 0.99) on the per-series RMSSE of the five methods: mean ranks and critical distance (H17). Also reported, not deciding: mean and median RMSSE, median time, failures and coverage per method, the relative RMSSE to ADAM ETS, and rmcb's p-value of equal mean ranks.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN13"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "D17",
+          "value": 0.9753,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.9470396739420402,
+            "upper": 1.0043830353548469
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D17",
+          "value": 0.9909,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.9753390861558684,
+            "upper": 1.006654290099668
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "D17",
+          "value": 0.8244,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.7980923108751354,
+            "upper": 0.8515454531276542
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS",
+            "comparator": "seasonal naive 168"
+          }
+        },
+        {
+          "id": "R4",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.38753387533875,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.198102934861083,
+            "upper": 2.5769648158164165
+          },
+          "conditions": {
+            "split": "test",
+            "method": "AutoTBATS"
+          }
+        },
+        {
+          "id": "R5",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.558265582655823,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.3688346421781565,
+            "upper": 2.7476965231334898
+          },
+          "conditions": {
+            "split": "test",
+            "method": "forecast::tbats"
+          }
+        },
+        {
+          "id": "R6",
+          "variable": "mean rank of RMSSE, Nemenyi test",
+          "value": 2.4823848238482347,
+          "interval": {
+            "level": 0.99,
+            "lower": 2.292953883370568,
+            "upper": 2.6718157643259013
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "critical distance, Nemenyi test (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE), Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE); split: test (lab runs RN13)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            {
+              "variable": "critical distance, Nemenyi test (RMSSE)",
+              "conditions": {
+                "level": 0.99
+              }
+            },
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs forecast::tbats (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs AutoTBATS (RMSSE)",
+            "Holm-adjusted p-value, one-sided t-test, smooth TBATS vs seasonal naive 168 (RMSSE)"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.37886188095533324,
+                0.02814,
+                0.06692,
+                1.458e-41
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D1",
+          "D3",
+          "D4",
+          "D5",
+          "D6"
+        ],
+        "cases": [
+          "D18"
+        ],
+        "procedure": [
+          "D19",
+          "D15"
+        ],
+        "lens": [
+          "D16",
+          "D17",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "7cd242018acdf360e5fb49b3d990b72eb5395298",
+        "software": {
+          "python": "3.14.4",
+          "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
+        }
+      }
+    },
+    {
+      "id": "E18",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN14 under plan PL8. Design: One run of claimset-code/smooth-tbats/electricity_dnorm.py --data SR3 --split test --workers 16 --others RN13/measures.csv at commit cfc2f28, with the software and hardware recorded with the run (AC2's computer): on each of the 370 electricity series (D18), at each of the 7 daily origins of the last week (D19, the windows of PL7), smooth TBATS (D1, TBATS(lags=[1, 24, 168]) with its defaults, distribution='auto') and smooth TBATS dnorm (D20, the same with distribution='dnorm') are fitted to the preceding 1008 hours and forecast the next 48 with 95% prediction intervals, both in the same single-threaded worker one after the other, so that their elapsed times are measured under the same load; the 2590 windows spread over 16 worker processes. A fit that fails (an error or non-finite forecasts) gets the seasonal naive 168 forecasts and no interval, as in PL7. Analysis: Per window and method: RMSSE (D16), the coverage of the 95% interval (D12), the elapsed time (D13); per series their means over the 7 origins. The three one-sided t-tests of the decision rule (H20, H21, H22), Holm-adjusted over the three. Reported, not deciding: mean and median RMSSE, coverage, median time and failures per method; relative RMSSE and relative elapsed time of dnorm to auto with 99% intervals; the Nemenyi test (D15, greybox rmcb, level 0.99) on the per-series RMSSE of all six methods (smooth TBATS and smooth TBATS dnorm from this run, forecast::tbats, AutoTBATS, ADAM ETS and seasonal naive 168 from RN13's per-series measures) with its plot (nemenyi.png); the tables of the methods, the tests and the Nemenyi test as CSV files (table_methods.csv, table_tests.csv, table_nemenyi.csv), each recorded as an artefact of the study.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN14"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "mean coverage of smooth TBATS dnorm minus 0.95",
+          "value": -0.0168,
+          "interval": {
+            "level": 0.99,
+            "lower": -0.02364168981181017,
+            "upper": -0.00995619378607335
+          },
+          "conditions": {
+            "split": "test"
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D17",
+          "value": 0.9274901866520837,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.782479221333724,
+            "upper": 1.099374939144907
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS dnorm",
+            "comparator": "smooth TBATS"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "relative elapsed time",
+          "value": 0.6368,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.6189769713949341,
+            "upper": 0.6552110342663261
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS dnorm",
+            "comparator": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "Holm-adjusted p-value, one-sided t-test, RMSSE, Holm-adjusted p-value, one-sided t-test, coverage, Holm-adjusted p-value, one-sided t-test, time; split: test (lab runs RN14)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            "Holm-adjusted p-value, one-sided t-test, RMSSE",
+            "Holm-adjusted p-value, one-sided t-test, coverage",
+            "Holm-adjusted p-value, one-sided t-test, time"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.8738080346463214,
+                6.108e-10,
+                2.443e-139
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D20",
+          "D1"
+        ],
+        "cases": [
+          "D18"
+        ],
+        "procedure": [
+          "D19"
+        ],
+        "lens": [
+          "D16",
+          "D17",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "cfc2f285c07bfc9ec05809902dcc354a883f6cab",
+        "software": {
+          "python": "3.14.4",
+          "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
+        }
+      }
+    },
+    {
+      "id": "E19",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN14 under plan PL8. Design: One run of claimset-code/smooth-tbats/electricity_dnorm.py --data SR3 --split test --workers 16 --others RN13/measures.csv at commit cfc2f28, with the software and hardware recorded with the run (AC2's computer): on each of the 370 electricity series (D18), at each of the 7 daily origins of the last week (D19, the windows of PL7), smooth TBATS (D1, TBATS(lags=[1, 24, 168]) with its defaults, distribution='auto') and smooth TBATS dnorm (D20, the same with distribution='dnorm') are fitted to the preceding 1008 hours and forecast the next 48 with 95% prediction intervals, both in the same single-threaded worker one after the other, so that their elapsed times are measured under the same load; the 2590 windows spread over 16 worker processes. A fit that fails (an error or non-finite forecasts) gets the seasonal naive 168 forecasts and no interval, as in PL7. Analysis: Per window and method: RMSSE (D16), the coverage of the 95% interval (D12), the elapsed time (D13); per series their means over the 7 origins. The three one-sided t-tests of the decision rule (H20, H21, H22), Holm-adjusted over the three. Reported, not deciding: mean and median RMSSE, coverage, median time and failures per method; relative RMSSE and relative elapsed time of dnorm to auto with 99% intervals; the Nemenyi test (D15, greybox rmcb, level 0.99) on the per-series RMSSE of all six methods (smooth TBATS and smooth TBATS dnorm from this run, forecast::tbats, AutoTBATS, ADAM ETS and seasonal naive 168 from RN13's per-series measures) with its plot (nemenyi.png); the tables of the methods, the tests and the Nemenyi test as CSV files (table_methods.csv, table_tests.csv, table_nemenyi.csv), each recorded as an artefact of the study.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN14"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "mean coverage of smooth TBATS dnorm minus 0.95",
+          "value": -0.01679894179894176,
+          "interval": {
+            "level": 0.99,
+            "lower": -0.02364168981181017,
+            "upper": -0.00995619378607335
+          },
+          "conditions": {
+            "split": "test"
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D17",
+          "value": 0.9275,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.782479221333724,
+            "upper": 1.099374939144907
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS dnorm",
+            "comparator": "smooth TBATS"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "relative elapsed time",
+          "value": 0.6368,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.6189769713949341,
+            "upper": 0.6552110342663261
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS dnorm",
+            "comparator": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "Holm-adjusted p-value, one-sided t-test, RMSSE, Holm-adjusted p-value, one-sided t-test, coverage, Holm-adjusted p-value, one-sided t-test, time; split: test (lab runs RN14)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            "Holm-adjusted p-value, one-sided t-test, RMSSE",
+            "Holm-adjusted p-value, one-sided t-test, coverage",
+            "Holm-adjusted p-value, one-sided t-test, time"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.8738,
+                6.107568971470071e-10,
+                2.443e-139
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D20",
+          "D1"
+        ],
+        "cases": [
+          "D18"
+        ],
+        "procedure": [
+          "D19"
+        ],
+        "lens": [
+          "D16",
+          "D17",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "cfc2f285c07bfc9ec05809902dcc354a883f6cab",
+        "software": {
+          "python": "3.14.4",
+          "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
+        }
+      }
+    },
+    {
+      "id": "E20",
+      "profile": "quant",
+      "design": "other",
+      "description": "Lab runs RN14 under plan PL8. Design: One run of claimset-code/smooth-tbats/electricity_dnorm.py --data SR3 --split test --workers 16 --others RN13/measures.csv at commit cfc2f28, with the software and hardware recorded with the run (AC2's computer): on each of the 370 electricity series (D18), at each of the 7 daily origins of the last week (D19, the windows of PL7), smooth TBATS (D1, TBATS(lags=[1, 24, 168]) with its defaults, distribution='auto') and smooth TBATS dnorm (D20, the same with distribution='dnorm') are fitted to the preceding 1008 hours and forecast the next 48 with 95% prediction intervals, both in the same single-threaded worker one after the other, so that their elapsed times are measured under the same load; the 2590 windows spread over 16 worker processes. A fit that fails (an error or non-finite forecasts) gets the seasonal naive 168 forecasts and no interval, as in PL7. Analysis: Per window and method: RMSSE (D16), the coverage of the 95% interval (D12), the elapsed time (D13); per series their means over the 7 origins. The three one-sided t-tests of the decision rule (H20, H21, H22), Holm-adjusted over the three. Reported, not deciding: mean and median RMSSE, coverage, median time and failures per method; relative RMSSE and relative elapsed time of dnorm to auto with 99% intervals; the Nemenyi test (D15, greybox rmcb, level 0.99) on the per-series RMSSE of all six methods (smooth TBATS and smooth TBATS dnorm from this run, forecast::tbats, AutoTBATS, ADAM ETS and seasonal naive 168 from RN13's per-series measures) with its plot (nemenyi.png); the tables of the methods, the tests and the Nemenyi test as CSV files (table_methods.csv, table_tests.csv, table_nemenyi.csv), each recorded as an artefact of the study.",
+      "availability": {
+        "level": "public"
+      },
+      "lab_runs": [
+        "RN14"
+      ],
+      "results": [
+        {
+          "id": "R1",
+          "variable": "mean coverage of smooth TBATS dnorm minus 0.95",
+          "value": -0.0168,
+          "interval": {
+            "level": 0.99,
+            "lower": -0.02364168981181017,
+            "upper": -0.00995619378607335
+          },
+          "conditions": {
+            "split": "test"
+          }
+        },
+        {
+          "id": "R2",
+          "variable": "D17",
+          "value": 0.9275,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.782479221333724,
+            "upper": 1.099374939144907
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS dnorm",
+            "comparator": "smooth TBATS"
+          }
+        },
+        {
+          "id": "R3",
+          "variable": "relative elapsed time",
+          "value": 0.636836353873358,
+          "interval": {
+            "level": 0.99,
+            "lower": 0.6189769713949341,
+            "upper": 0.6552110342663261
+          },
+          "conditions": {
+            "split": "test",
+            "method": "smooth TBATS dnorm",
+            "comparator": "smooth TBATS"
+          }
+        }
+      ],
+      "tables": [
+        {
+          "id": "T1",
+          "description": "Holm-adjusted p-value, one-sided t-test, RMSSE, Holm-adjusted p-value, one-sided t-test, coverage, Holm-adjusted p-value, one-sided t-test, time; split: test (lab runs RN14)",
+          "conditions": {
+            "split": "test"
+          },
+          "row_labels": [],
+          "columns": [
+            "Holm-adjusted p-value, one-sided t-test, RMSSE",
+            "Holm-adjusted p-value, one-sided t-test, coverage",
+            "Holm-adjusted p-value, one-sided t-test, time"
+          ],
+          "rows": [
+            {
+              "id": "r1",
+              "label": [],
+              "values": [
+                0.8738,
+                6.108e-10,
+                2.4431847468486607e-139
+              ]
+            }
+          ],
+          "artefact": "A8"
+        }
+      ],
+      "artefacts": [
+        "A8"
+      ],
+      "setup": {
+        "studied": [
+          "D20",
+          "D1"
+        ],
+        "cases": [
+          "D18"
+        ],
+        "procedure": [
+          "D19"
+        ],
+        "lens": [
+          "D16",
+          "D17",
+          "D12",
+          "D13"
+        ]
+      },
+      "execution": {
+        "code_version": "cfc2f285c07bfc9ec05809902dcc354a883f6cab",
+        "software": {
+          "python": "3.14.4",
+          "platform": "Linux-7.0.0-42-generic-x86_64-with-glibc2.43"
+        }
+      }
+    }
+  ],
+  "warrants": [],
+  "limitations": [],
+  "artefacts": [
+    {
+      "id": "A1",
+      "kind": "figure",
+      "uri": "claimset/smooth-tbats/lab/runs/RN14/nemenyi.png",
+      "availability": {
+        "level": "public"
+      },
+      "version": "sha256:0d4fda83435b81dbce46394e8ecd6eb015de748e39cfd3e21530664f056a3d85",
+      "description": "Nemenyi test (greybox rmcb, level 0.99) on the per-series RMSSE of the six methods on the electricity data, test split, 369 series: mean ranks with their 99% intervals; smooth TBATS and smooth TBATS dnorm from RN14, the other four from RN13 (PL8)."
+    },
+    {
+      "id": "A2",
+      "kind": "table",
+      "uri": "claimset/smooth-tbats/lab/runs/RN14/table_methods.csv",
+      "availability": {
+        "level": "public"
+      },
+      "version": "sha256:4fb964bbf3aa381b300bdbc37951c6c1ea25690483b66fc6c50d406a1974a462",
+      "description": "Per method (smooth TBATS, smooth TBATS dnorm): mean and median RMSSE, coverage of the 95% interval, median elapsed time, failed series and fits, on the electricity data, test split (RN14, PL8)."
+    },
+    {
+      "id": "A3",
+      "kind": "table",
+      "uri": "claimset/smooth-tbats/lab/runs/RN14/table_tests.csv",
+      "availability": {
+        "level": "public"
+      },
+      "version": "sha256:13e708c3aefebd395edf371d2905624d7334bd7011b3c56b82e8f4ee5e720f15",
+      "description": "The three one-sided t-tests of PL8 (RMSSE, coverage, time of smooth TBATS dnorm against smooth TBATS and the nominal 0.95), with 99% intervals, raw and Holm-adjusted p-values, series counts; relative RMSSE and elapsed time (RN14)."
+    },
+    {
+      "id": "A4",
+      "kind": "table",
+      "uri": "claimset/smooth-tbats/lab/runs/RN14/table_nemenyi.csv",
+      "availability": {
+        "level": "public"
+      },
+      "version": "sha256:8a8739d90b11f0c4673e3d7b5ee2063918779bbb9391cb62ac16ed5e99a1d983",
+      "description": "Nemenyi test of the six methods on the electricity data, test split: mean ranks of RMSSE with 99% intervals, critical distance, series count, p-value of equal mean ranks (RN14, PL8)."
+    },
+    {
+      "id": "A5",
+      "kind": "data",
+      "version": "sha256:ea59b7783573c49077a835ab6465c7d66f1474783360f310988a9a737fbca62f",
+      "description": "M4 Hourly-train.csv (text/csv), saved by hand on 2026-11-11; recorded in the lab record as SR1 on 2026-11-11. venue: GitHub, Mcompetitions/M4-methods. Written by others. M4 competition hourly data, train samples, one series per row",
+      "uri": "https://raw.githubusercontent.com/Mcompetitions/M4-methods/master/Dataset/Train/Hourly-train.csv",
+      "availability": {
+        "level": "author_only",
+        "reason": "legal",
+        "content_hash": "sha256:ea59b7783573c49077a835ab6465c7d66f1474783360f310988a9a737fbca62f"
+      },
+      "reference": "B1"
+    },
+    {
+      "id": "A6",
+      "kind": "data",
+      "version": "sha256:71a57fccb15e534d973626ada4fb87febf789e9317715b7cc6dd3b5f90db6f42",
+      "description": "M4 Hourly-test.csv (text/csv), saved by hand on 2026-11-11; recorded in the lab record as SR2 on 2026-11-11. venue: GitHub, Mcompetitions/M4-methods. Written by others. M4 competition hourly data, test samples, one series per row",
+      "uri": "https://raw.githubusercontent.com/Mcompetitions/M4-methods/master/Dataset/Test/Hourly-test.csv",
+      "availability": {
+        "level": "author_only",
+        "reason": "legal",
+        "content_hash": "sha256:71a57fccb15e534d973626ada4fb87febf789e9317715b7cc6dd3b5f90db6f42"
+      },
+      "reference": "B2"
+    },
+    {
+      "id": "A7",
+      "kind": "data",
+      "version": "sha256:b80a63a4963f487dc3b2a3be8cb17b3c1e54f71fddae9b5a12967b38c990c4cf",
+      "description": "GluonTS electricity_nips data set (application/gzip), saved by hand on 2026-11-12; recorded in the lab record as SR3 on 2026-11-12. venue: GitHub, mbohlkeschneider/gluon-ts (branch mv_release). Written by others. Hourly electricity consumption (kW) of 370 clients of a Portuguese utility, from the UCI ElectricityLoadDiagrams20112014 data, as prepared for DeepAR (Salinas et al.): train/data.json ends 2014-09-01 01:00, test/data.json holds 7 daily rolling windows ending 2014-09-02 to 2014-09-08 01:00, in GluonTS JSON lines.",
+      "uri": "https://raw.githubusercontent.com/mbohlkeschneider/gluon-ts/mv_release/datasets/electricity_nips.tar.gz",
+      "availability": {
+        "level": "author_only",
+        "reason": "legal",
+        "content_hash": "sha256:b80a63a4963f487dc3b2a3be8cb17b3c1e54f71fddae9b5a12967b38c990c4cf"
+      },
+      "reference": "B3"
+    },
+    {
+      "id": "A8",
+      "kind": "data",
+      "uri": "files/smooth-tbats.results.csv",
+      "version": "sha256:ae12e94c62124549f3b86e89845c3649871a16333ea641e4735f47be23eb16a9",
+      "availability": {
+        "level": "public"
+      },
+      "description": "Every result of the lab record (1308 results of 14 runs) at full precision: the lab result's ID, its run, the quantity as the run's script named it, its conditions and its value (both as JSON). The evidence's tables give the values to four significant digits.",
+      "columns": [
+        {
+          "name": "lab_result",
+          "dimension": "the result event of the lab record"
+        },
+        {
+          "name": "run",
+          "dimension": "the lab run that produced it"
+        },
+        {
+          "name": "quantity",
+          "dimension": "the quantity, as the run's script named it"
+        },
+        {
+          "name": "conditions",
+          "dimension": "the result's conditions, as JSON"
+        },
+        {
+          "name": "value",
+          "variable": "the value of the quantity, as JSON, at full precision"
+        }
+      ]
+    },
+    {
+      "id": "A9",
+      "kind": "lab_record",
+      "uri": "https://github.com/openforecast-org/smooth/blob/fae164c9eb7b2b7fce66ba18b188b32cd0a12a76/lab/lab.jsonl",
+      "version": "sha256:2318492b2db369875b63a24f73d83094534fb3f8c5926cc581707687a5a1e2eb",
+      "availability": {
+        "level": "public"
+      },
+      "description": "Lab record of the study: questions, hypotheses, plans, runs, results and decisions, as an append-only, hash-chained event log (Claimset lab record specification v0.21, begun 2026-11-11; exported with claimset 0.41.6)."
+    }
+  ],
+  "references": [
+    {
+      "id": "B1",
+      "target": "https://raw.githubusercontent.com/Mcompetitions/M4-methods/master/Dataset/Train/Hourly-train.csv",
+      "id_type": "url"
+    },
+    {
+      "id": "B2",
+      "target": "https://raw.githubusercontent.com/Mcompetitions/M4-methods/master/Dataset/Test/Hourly-test.csv",
+      "id_type": "url"
+    },
+    {
+      "id": "B3",
+      "target": "https://raw.githubusercontent.com/mbohlkeschneider/gluon-ts/mv_release/datasets/electricity_nips.tar.gz",
+      "id_type": "url"
+    }
+  ]
+}

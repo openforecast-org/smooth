@@ -1,5 +1,5 @@
 {
- "schema_version": "0.41",
+ "schema_version": "0.42",
  "paper": {
   "title": "TBATS in smooth: its formulation, and its accuracy against forecast::tbats and AutoTBATS on hourly data",
   "contributions": [
@@ -48,6 +48,12 @@
     "state space models",
     "forecasting software",
     "forecast evaluation"
+   ],
+   "subfield": "openalex:subfields/1803",
+   "topics": [
+    "openalex:T11918",
+    "openalex:T10007",
+    "openalex:T10282"
    ]
   },
   "declarations": {
@@ -60,7 +66,10 @@
    "C13",
    "C17",
    "D1"
-  ]
+  ],
+  "id": "entrylib:2026.000007",
+  "summary": "TBATS forecasts series with several seasonal cycles, such as hourly electricity use with daily and weekly patterns. The smooth package for R and Python builds TBATS inside its general state space framework. Simulated checks show that, without ARMA terms, it is the same model as the original TBATS of De Livera, Hyndman and Snyder to rounding error; its ARMA terms differ, adding a separate component instead of modelling the errors. On the 414 hourly series of the M4 competition, forecasting 48 hours ahead, smooth's TBATS ranked as more accurate than the TBATS of R's forecast package and of Python's statsforecast, and took about 58% of the forecast package's time. On one week of 370 hourly electricity series, it was more accurate than repeating the last week, but not shown to differ from the other two. Assuming normally distributed errors made it faster, with intervals that covered fewer values than intended.",
+  "correction_reason": "The paper had no summary: a summary in plain language for readers outside forecasting is added, and the equation of the harmonic states in the definition of smooth TBATS (D1) is set on a line of its own instead of inside a sentence."
  },
  "contributors": [
   {
@@ -187,7 +196,7 @@
    "id": "D1",
    "term": "smooth TBATS",
    "kind": "method",
-   "definition": "TBATS of the smooth package (R `tbats()`, Python `TBATS`): a linear single-source-of-error state space model of the Box-Cox transform $y_t^{(\\lambda)}$ of the series, built on ADAM's state space core,\n$$\\begin{aligned} y_t^{(\\lambda)} &= w^\\top v_{t-\\boldsymbol{l}} + \\epsilon_t, \\\\ v_t &= F v_{t-\\boldsymbol{l}} + g \\epsilon_t, \\end{aligned}$$\nwhere $v_{t-\\boldsymbol{l}}$ takes each state at its own lag. The level $l_t$ and the trend $b_t$ are those of ETS(A,N,N), ETS(A,A,N) or ETS(A,Ad,N),\n$$\\begin{aligned} l_t &= l_{t-1} + \\phi b_{t-1} + \\alpha \\epsilon_t, \\\\ b_t &= \\phi b_{t-1} + \\beta \\epsilon_t. \\end{aligned}$$\nEach harmonic $j = 1, \\dots, k_i$ of each period $m_i$, with frequency $\\lambda_{ij} = 2 \\pi j / m_i$, is two states $v^{(ij)}_1$ and $v^{(ij)}_2$ with lags 1 and 2 in the ARIMA slot of ADAM's core,\n$$\\begin{aligned} u_{ij,t} &= v^{(ij)}_{1,t-1} + v^{(ij)}_{2,t-2}, \\\\ v^{(ij)}_{1,t} &= 2 \\cos(\\lambda_{ij}) \\, u_{ij,t} + \\gamma_{1i} \\epsilon_t, \\\\ v^{(ij)}_{2,t} &= -u_{ij,t} + \\left(\\sin(\\lambda_{ij}) \\gamma_{2i} - \\cos(\\lambda_{ij}) \\gamma_{1i}\\right) \\epsilon_t, \\end{aligned}$$\nso that $(1 - 2 \\cos(\\lambda_{ij}) B + B^2) \\, u_{ij,t} = \\left(\\gamma_{1i} B + (\\sin(\\lambda_{ij}) \\gamma_{2i} - \\cos(\\lambda_{ij}) \\gamma_{1i}) B^2\\right) \\epsilon_t$. The measurement equation is\n$$y_t^{(\\lambda)} = l_{t-1} + \\phi b_{t-1} + \\sum_i \\sum_{j=1}^{k_i} u_{ij,t} + a_t + \\epsilon_t,$$\nwhere $a_t$ is an optional ARMA component of ADAM: an additive block of states whose output enters the measurement equation, not ARMA errors. $\\lambda \\in [0, 1]$ is estimated by likelihood with the Jacobian of the transform. The harmonics are preselected by information criterion on a global regression of the transformed series on Fourier terms, and the trend and the ARMA orders are selected by AICc. With the default `distribution=\"auto\"`, the structure is selected with the generalised normal distribution of $\\epsilon_t$, and the closest of the normal, Laplace and S distributions to its estimated shape is then fitted on that structure. Code: R/adam-tbats.R and python/src/smooth/adam_general/core/tbats/ of the smooth repository, at the code versions the evidence names."
+   "definition": "TBATS of the smooth package (R `tbats()`, Python `TBATS`): a linear single-source-of-error state space model of the Box-Cox transform $y_t^{(\\lambda)}$ of the series, built on ADAM's state space core,\n$$\\begin{aligned} y_t^{(\\lambda)} &= w^\\top v_{t-\\boldsymbol{l}} + \\epsilon_t, \\\\ v_t &= F v_{t-\\boldsymbol{l}} + g \\epsilon_t, \\end{aligned}$$\nwhere $v_{t-\\boldsymbol{l}}$ takes each state at its own lag. The level $l_t$ and the trend $b_t$ are those of ETS(A,N,N), ETS(A,A,N) or ETS(A,Ad,N),\n$$\\begin{aligned} l_t &= l_{t-1} + \\phi b_{t-1} + \\alpha \\epsilon_t, \\\\ b_t &= \\phi b_{t-1} + \\beta \\epsilon_t. \\end{aligned}$$\nEach harmonic $j = 1, \\dots, k_i$ of each period $m_i$, with frequency $\\lambda_{ij} = 2 \\pi j / m_i$, is two states $v^{(ij)}_1$ and $v^{(ij)}_2$ with lags 1 and 2 in the ARIMA slot of ADAM's core,\n$$\\begin{aligned} u_{ij,t} &= v^{(ij)}_{1,t-1} + v^{(ij)}_{2,t-2}, \\\\ v^{(ij)}_{1,t} &= 2 \\cos(\\lambda_{ij}) \\, u_{ij,t} + \\gamma_{1i} \\epsilon_t, \\\\ v^{(ij)}_{2,t} &= -u_{ij,t} + \\left(\\sin(\\lambda_{ij}) \\gamma_{2i} - \\cos(\\lambda_{ij}) \\gamma_{1i}\\right) \\epsilon_t, \\end{aligned}$$\nso that, with the backshift operator $B$,\n$$(1 - 2 \\cos(\\lambda_{ij}) B + B^2) \\, u_{ij,t} = \\left(\\gamma_{1i} B + (\\sin(\\lambda_{ij}) \\gamma_{2i} - \\cos(\\lambda_{ij}) \\gamma_{1i}) B^2\\right) \\epsilon_t.$$\nThe measurement equation is\n$$y_t^{(\\lambda)} = l_{t-1} + \\phi b_{t-1} + \\sum_i \\sum_{j=1}^{k_i} u_{ij,t} + a_t + \\epsilon_t,$$\nwhere $a_t$ is an optional ARMA component of ADAM: an additive block of states whose output enters the measurement equation, not ARMA errors. $\\lambda \\in [0, 1]$ is estimated by likelihood with the Jacobian of the transform. The harmonics are preselected by information criterion on a global regression of the transformed series on Fourier terms, and the trend and the ARMA orders are selected by AICc. With the default `distribution=\"auto\"`, the structure is selected with the generalised normal distribution of $\\epsilon_t$, and the closest of the normal, Laplace and S distributions to its estimated shape is then fitted on that structure. Code: R/adam-tbats.R and python/src/smooth/adam_general/core/tbats/ of the smooth repository, at the code versions the evidence names."
   },
   {
    "id": "D2",
@@ -397,7 +406,9 @@
      "strength": "high",
      "rationale": "360 cases over four sets of periods, three trends and three Box-Cox parameters, all within 1e-13 of an independent implementation."
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C2",
@@ -463,7 +474,9 @@
      "series of 300 observations",
      "a level and harmonics of the periods 7.3 and 24"
     ]
-   }
+   },
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C3",
@@ -545,7 +558,9 @@
      "strength": "high",
      "rationale": "A deterministic check of the model's matrices: the response matches the additive component to machine precision."
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C4",
@@ -642,7 +657,9 @@
      "target": "C10",
      "id_type": "local"
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C5",
@@ -738,7 +755,9 @@
      "target": "C11",
      "id_type": "local"
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C6",
@@ -834,7 +853,9 @@
      "target": "C12",
      "id_type": "local"
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C7",
@@ -926,7 +947,9 @@
      "reference": "B4",
      "note": "De Livera, Hyndman and Snyder introduced TBATS; this claim is about the implementation of smooth, which places the harmonics in ADAM's state space core, compared with two other implementations."
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C8",
@@ -1007,7 +1030,9 @@
      "reference": "B4",
      "note": "De Livera, Hyndman and Snyder introduced TBATS; this claim is about the implementation of smooth, which places the harmonics in ADAM's state space core, compared with two other implementations."
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C9",
@@ -1118,7 +1143,9 @@
      "target": "C13",
      "id_type": "local"
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C10",
@@ -1209,7 +1236,9 @@
      "reference": "B4",
      "note": "De Livera, Hyndman and Snyder introduced TBATS; this claim is about the implementation of smooth, which places the harmonics in ADAM's state space core, compared with two other implementations."
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C11",
@@ -1304,7 +1333,9 @@
      "target": "C13",
      "id_type": "local"
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C12",
@@ -1394,7 +1425,9 @@
      "reference": "B4",
      "note": "De Livera, Hyndman and Snyder introduced TBATS; this claim is about the implementation of smooth, which places the harmonics in ADAM's state space core, compared with two other implementations."
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C13",
@@ -1499,7 +1532,9 @@
      "reference": "B4",
      "note": "De Livera, Hyndman and Snyder introduced TBATS; this claim is about the implementation of smooth, which places the harmonics in ADAM's state space core, compared with two other implementations."
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C14",
@@ -1594,7 +1629,9 @@
      "target": "C10",
      "id_type": "local"
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C15",
@@ -1689,7 +1726,9 @@
      "target": "C11",
      "id_type": "local"
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C16",
@@ -1784,7 +1823,9 @@
      "target": "C12",
      "id_type": "local"
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C17",
@@ -1893,7 +1934,9 @@
      "target": "C13",
      "id_type": "local"
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C18",
@@ -1985,7 +2028,9 @@
      "target": "C19",
      "id_type": "local"
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C19",
@@ -2074,7 +2119,9 @@
      "target": "C20",
      "id_type": "local"
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   },
   {
    "id": "C20",
@@ -2161,7 +2208,9 @@
      "reference": "B4",
      "note": "De Livera, Hyndman and Snyder introduced TBATS; this claim is about the implementation of smooth, which places the harmonics in ADAM's state space core, compared with two other implementations."
     }
-   ]
+   ],
+   "verifiability": "open",
+   "verifiability_flags": []
   }
  ],
  "evidence": [
@@ -3973,7 +4022,7 @@
   {
    "id": "A1",
    "kind": "figure",
-   "uri": "files/nemenyi_electricity_six_methods.png",
+   "uri": "https://entrylib.org/p/2026.000007/v1/files/files/nemenyi_electricity_six_methods.png",
    "availability": {
     "level": "public"
    },
@@ -3993,7 +4042,7 @@
   {
    "id": "A2",
    "kind": "table",
-   "uri": "files/dnorm_methods.csv",
+   "uri": "https://entrylib.org/p/2026.000007/v1/files/files/dnorm_methods.csv",
    "availability": {
     "level": "public"
    },
@@ -4004,7 +4053,7 @@
   {
    "id": "A3",
    "kind": "table",
-   "uri": "files/dnorm_tests.csv",
+   "uri": "https://entrylib.org/p/2026.000007/v1/files/files/dnorm_tests.csv",
    "availability": {
     "level": "public"
    },
@@ -4015,7 +4064,7 @@
   {
    "id": "A4",
    "kind": "table",
-   "uri": "files/nemenyi_electricity_six_methods.csv",
+   "uri": "https://entrylib.org/p/2026.000007/v1/files/files/nemenyi_electricity_six_methods.csv",
    "availability": {
     "level": "public"
    },
@@ -4059,7 +4108,7 @@
   {
    "id": "A8",
    "kind": "data",
-   "uri": "files/smooth-tbats.results.csv",
+   "uri": "https://entrylib.org/p/2026.000007/v1/files/files/smooth-tbats.results.csv",
    "version": "sha256:ae12e94c62124549f3b86e89845c3649871a16333ea641e4735f47be23eb16a9",
    "availability": {
     "level": "public"

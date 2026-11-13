@@ -1,0 +1,10 @@
+variable,method,value,interval level,interval lower,interval upper,methods,level
+"mean rank of RMSSE, Nemenyi test",ADAM ETS,3.9945799457994617,0.99,3.762932077249007,4.226227814349917,all six,
+"mean rank of RMSSE, Nemenyi test",AutoTBATS,2.9214092140921437,0.99,2.689761345541689,3.1530570826425985,all six,
+"mean rank of RMSSE, Nemenyi test",forecast::tbats,3.121951219512199,0.99,2.890303350961744,3.3535990880626536,all six,
+"mean rank of RMSSE, Nemenyi test",seasonal naive 168,5.165311653116532,0.99,4.933663784566077,5.396959521666988,all six,
+"mean rank of RMSSE, Nemenyi test",smooth TBATS,3.0298102981029835,0.99,2.7981624295525287,3.2614581666534384,all six,
+"mean rank of RMSSE, Nemenyi test",smooth TBATS dnorm,2.7669376693766967,0.99,2.535289800826242,2.9985855379271515,all six,
+"critical distance, Nemenyi test (RMSSE)",,0.46329573710090965,,,,all six,0.99
+series in Nemenyi test,,369.0,,,,all six,
+"p-value, rmcb test of equal mean ranks (RMSSE)",,1.0372190587495083e-94,,,,all six,

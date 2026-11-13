@@ -1,0 +1,39 @@
+RMSSE {'split': 'test', 'method': 'smooth TBATS', 'statistic': 'mean'} 0.79483 
+RMSSE {'split': 'test', 'method': 'smooth TBATS', 'statistic': 'median'} 0.66441 
+coverage {'split': 'test', 'method': 'smooth TBATS', 'nominal level': 0.95} 0.95399 
+elapsed time {'split': 'test', 'method': 'smooth TBATS', 'statistic': 'median'} 12.64446 
+series failed {'split': 'test', 'method': 'smooth TBATS'} 0 
+fits failed {'split': 'test', 'method': 'smooth TBATS'} 0 
+RMSSE {'split': 'test', 'method': 'smooth TBATS dnorm', 'statistic': 'mean'} 0.78359 
+RMSSE {'split': 'test', 'method': 'smooth TBATS dnorm', 'statistic': 'median'} 0.65544 
+coverage {'split': 'test', 'method': 'smooth TBATS dnorm', 'nominal level': 0.95} 0.9332 
+elapsed time {'split': 'test', 'method': 'smooth TBATS dnorm', 'statistic': 'median'} 8.0313 
+series failed {'split': 'test', 'method': 'smooth TBATS dnorm'} 0 
+fits failed {'split': 'test', 'method': 'smooth TBATS dnorm'} 0 
+mean log ratio of RMSSE, smooth TBATS to smooth TBATS dnorm {'split': 'test'} 0.07527 {'level': 0.99, 'lower': -0.09474178115542094, 'upper': 0.2452879111265014}
+p-value, one-sided t-test, RMSSE {'split': 'test'} 0.87381 
+Holm-adjusted p-value, one-sided t-test, RMSSE {'split': 'test'} 0.87381 
+series in the t-test, RMSSE {'split': 'test'} 369 
+series excluded by a non-finite value, RMSSE {'split': 'test'} 0 
+mean coverage of smooth TBATS dnorm minus 0.95 {'split': 'test'} -0.0168 {'level': 0.99, 'lower': -0.02364168981181017, 'upper': -0.00995619378607335}
+p-value, one-sided t-test, coverage {'split': 'test'} 0.0 
+Holm-adjusted p-value, one-sided t-test, coverage {'split': 'test'} 0.0 
+series in the t-test, coverage {'split': 'test'} 369 
+series excluded by a non-finite value, coverage {'split': 'test'} 0 
+mean log ratio of elapsed time, smooth TBATS dnorm to smooth TBATS {'split': 'test'} -0.45124 {'level': 0.99, 'lower': -0.47968720990568653, 'upper': -0.42279790551926527}
+p-value, one-sided t-test, time {'split': 'test'} 0.0 
+Holm-adjusted p-value, one-sided t-test, time {'split': 'test'} 0.0 
+series in the t-test, time {'split': 'test'} 369 
+series excluded by a non-finite value, time {'split': 'test'} 0 
+relative RMSSE {'split': 'test', 'method': 'smooth TBATS dnorm', 'comparator': 'smooth TBATS'} 0.92749 {'level': 0.99, 'lower': 0.782479221333724, 'upper': 1.099374939144907}
+relative elapsed time {'split': 'test', 'method': 'smooth TBATS dnorm', 'comparator': 'smooth TBATS'} 0.63684 {'level': 0.99, 'lower': 0.6189769713949341, 'upper': 0.6552110342663261}
+mean rank of RMSSE, Nemenyi test {'split': 'test', 'method': 'ADAM ETS', 'methods': 'all six'} 3.99458 {'level': 0.99, 'lower': 3.762932077249007, 'upper': 4.226227814349917}
+mean rank of RMSSE, Nemenyi test {'split': 'test', 'method': 'AutoTBATS', 'methods': 'all six'} 2.92141 {'level': 0.99, 'lower': 2.689761345541689, 'upper': 3.1530570826425985}
+mean rank of RMSSE, Nemenyi test {'split': 'test', 'method': 'forecast::tbats', 'methods': 'all six'} 3.12195 {'level': 0.99, 'lower': 2.890303350961744, 'upper': 3.3535990880626536}
+mean rank of RMSSE, Nemenyi test {'split': 'test', 'method': 'seasonal naive 168', 'methods': 'all six'} 5.16531 {'level': 0.99, 'lower': 4.933663784566077, 'upper': 5.396959521666988}
+mean rank of RMSSE, Nemenyi test {'split': 'test', 'method': 'smooth TBATS', 'methods': 'all six'} 3.02981 {'level': 0.99, 'lower': 2.7981624295525287, 'upper': 3.2614581666534384}
+mean rank of RMSSE, Nemenyi test {'split': 'test', 'method': 'smooth TBATS dnorm', 'methods': 'all six'} 2.76694 {'level': 0.99, 'lower': 2.535289800826242, 'upper': 2.9985855379271515}
+critical distance, Nemenyi test (RMSSE) {'split': 'test', 'level': 0.99, 'methods': 'all six'} 0.4633 
+series in Nemenyi test {'split': 'test', 'methods': 'all six'} 369 
+p-value, rmcb test of equal mean ranks (RMSSE) {'split': 'test', 'methods': 'all six'} 0.0 
+series excluded by undefined RMSSE {'split': 'test'} 1 

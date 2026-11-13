@@ -1,0 +1,18 @@
+variable,method,value,interval level,interval lower,interval upper,comparator
+"mean log ratio of RMSSE, smooth TBATS to smooth TBATS dnorm",,0.07527306498554022,0.99,-0.09474178115542094,0.2452879111265014,
+"p-value, one-sided t-test, RMSSE",,0.8738080346463214,,,,
+"Holm-adjusted p-value, one-sided t-test, RMSSE",,0.8738080346463214,,,,
+"series in the t-test, RMSSE",,369.0,,,,
+"series excluded by a non-finite value, RMSSE",,0.0,,,,
+mean coverage of smooth TBATS dnorm minus 0.95,,-0.01679894179894176,0.99,-0.02364168981181017,-0.00995619378607335,
+"p-value, one-sided t-test, coverage",,3.0537844857350357e-10,,,,
+"Holm-adjusted p-value, one-sided t-test, coverage",,6.107568971470071e-10,,,,
+"series in the t-test, coverage",,369.0,,,,
+"series excluded by a non-finite value, coverage",,0.0,,,,
+"mean log ratio of elapsed time, smooth TBATS dnorm to smooth TBATS",,-0.4512425577124759,0.99,-0.47968720990568653,-0.42279790551926527,
+"p-value, one-sided t-test, time",,8.143949156162202e-140,,,,
+"Holm-adjusted p-value, one-sided t-test, time",,2.4431847468486607e-139,,,,
+"series in the t-test, time",,369.0,,,,
+"series excluded by a non-finite value, time",,0.0,,,,
+relative RMSSE,smooth TBATS dnorm,0.9274901866520837,0.99,0.782479221333724,1.099374939144907,smooth TBATS
+relative elapsed time,smooth TBATS dnorm,0.636836353873358,0.99,0.6189769713949341,0.6552110342663261,smooth TBATS

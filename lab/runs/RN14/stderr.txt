@@ -1,0 +1,2 @@
+/home/config/Misc/Python/Libraries/openforecast-org/smooth-tbats/claimset-code/smooth-tbats/m4_hourly.py:168: RuntimeWarning: invalid value encountered in scalar divide
+  "RMSSE": float(np.sqrt(np.mean((actual - mean) ** 2)) / scale),

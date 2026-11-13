@@ -1,0 +1,13 @@
+variable,method,statistic,value,nominal level
+RMSSE,smooth TBATS,mean,0.7948311998604708,
+RMSSE,smooth TBATS,median,0.6644125586706267,
+coverage,smooth TBATS,,0.9539859981933152,0.95
+elapsed time,smooth TBATS,median,12.644462182851774,
+series failed,smooth TBATS,,0.0,
+fits failed,smooth TBATS,,0.0,
+RMSSE,smooth TBATS dnorm,mean,0.7835943128894293,
+RMSSE,smooth TBATS dnorm,median,0.6554418734662713,
+coverage,smooth TBATS dnorm,,0.9332010582010583,0.95
+elapsed time,smooth TBATS dnorm,median,8.031296127288702,
+series failed,smooth TBATS dnorm,,0.0,
+fits failed,smooth TBATS dnorm,,0.0,
